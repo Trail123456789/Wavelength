@@ -56,17 +56,17 @@
     flex-direction:column;
     padding:max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
   }
-  button{
+  button, select {
     font-family:var(--font-body);
     cursor:pointer;
     border:none;
     -webkit-tap-highlight-color:transparent;
   }
-  button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+  button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible{
     outline:2px solid var(--teal);
     outline-offset:2px;
   }
-  input{
+  input, select {
     font-family:var(--font-body);
     background:var(--track-groove);
     border:1px solid var(--line);
@@ -258,6 +258,12 @@
   .topic-picker{display:flex; flex-direction:column; gap:12px;}
   .topic-picker .row{display:flex; gap:10px;}
   .topic-picker .row input{flex:1; min-width:0;}
+  
+  /* Dropdown + Random button specific alignment */
+  .category-select-wrapper { display:flex; flex:1; gap:6px; }
+  .category-select-wrapper select { flex:2; appearance:auto; border-color:var(--line); padding:0 10px; height: 100%; border-radius: 999px; }
+  .category-select-wrapper button { flex:1; }
+
   .swap-btn{background:var(--panel-raised); color:var(--text-muted); border-radius:999px; padding:0 12px; font-size:15px;}
 
   .reveal-box{display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;}
@@ -283,6 +289,7 @@
   @media (max-width:380px){
     .controls .btn{min-width:100%;}
     .topic-label{max-width:48%;}
+    .category-select-wrapper { flex-direction: column; }
   }
 </style>
 </head>
@@ -372,7 +379,6 @@
   var ROOM_PREFIX = "wvlen-sync-";
   var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; 
   
-  // Expanded connection reliability by mapping onto high-availability public ICE/STUN servers
   var PEER_OPTS = {
     config: {
       iceServers: [
@@ -384,37 +390,38 @@
     }
   };
 
-  // Target Zones mapping nicely to physical Wavelength point spreads
   var ZONES = [ {max:3.5, pts:4}, {max:8.5, pts:3}, {max:15, pts:2} ];
 
-  var TOPICS = [
-    ["Bad idea at work","Great idea at work"],
-    ["Overrated","Underrated"],
-    ["Terrible first date","Perfect first date"],
-    ["Boring superpower","Amazing superpower"],
-    ["Chaotic energy","Calm energy"],
-    ["Bad Minecraft build","Good Minecraft build"],
-    ["Mild inconvenience","Actual disaster"],
-    ["Niche hobby","Mainstream hobby"],
-    ["Would never eat it","Would eat it daily"],
-    ["Villain origin story","Hero origin story"],
-    ["Forgettable movie","Instant classic"],
-    ["Too spicy","Not spicy enough"],
-    ["Bad roommate habit","Ideal roommate habit"],
-    ["Old-fashioned","Futuristic"],
-    ["Low-effort costume","Elaborate costume"],
-    ["Comfort food","Fancy food"],
-    ["Bad gift","Great gift"],
-    ["Quiet night in","Wild night out"],
-    ["Ordinary pet","Exotic pet"],
-    ["Guilty pleasure","Genuinely great"],
-    ["Awkward silence","Great conversation"],
-    ["Underdog","Favorite to win"],
-    ["Basic vacation","Bucket-list trip"],
-    ["Mild flex","Massive flex"],
-    ["Nostalgic","Cutting-edge"],
-    ["Easy mode","Nightmare difficulty"]
-  ];
+  // MASSIVE CATEGORIZED PROMPTS DICTIONARY
+  var TOPICS = {
+    "Movies": [["Box office flop","Massive blockbuster"],["Terrible acting","Oscar-worthy performance"],["Boring pacing","Edge of your seat"],["Terrible CGI","Seamless VFX"],["Needs a sequel","Leave it alone"],["Forgettable villain","Iconic villain"],["Predictable twist","Mind-blowing twist"],["Awful ending","Perfect ending"],["Pretentious garbage","Absolute cinema"],["Horrible dialogue","Highly quotable"],["Ruined the franchise","Saved the franchise"],["Cash grab","Passion project"],["Aged poorly","Timeless masterpiece"],["Way too long","Perfect length"],["Soundtrack sucks","Soundtrack goes hard"],["Bad adaptation","Better than the book"],["Guilty pleasure","Genuinely great"],["Forgettable comedy","Piss-yourself funny"],["Not scary at all","Traumatizing horror"],["Bad chemistry","Iconic duo"],["Overrated classic","Underrated gem"],["Confusing plot","Brilliantly complex"],["Style over substance","Deeply meaningful"],["Pacing drags","Perfect flow"],["Hated by critics","Loved by critics"],["Nobody saw it","Cultural phenomenon"],["Awful worldbuilding","Immersive world"]],
+    "Bloons TD 6": [["Bad crosspath","Meta crosspath"],["Early game trash","Freeplay god"],["Needs a buff","Needs a nerf"],["F-tier Hero","S-tier Hero"],["Useless Paragon","OP Paragon"],["CHIMPS run ender","CHIMPS carry"],["Terrible T5","Amazing T5"],["Waste of money","Cost-effective"],["Bad map design","Great map design"],["Annoying bloon type","Easy bloon type"],["Useless monkey knowledge","Must-have knowledge"],["Terrible ability","Save-clutching ability"],["Only good for memes","Actually viable"],["Too much micro","AFK friendly"],["Terrible stepping stone","Great mid-game"],["Overpriced","Underpriced"],["Boss event nightmare","Boss event MVP"],["Requires too much setup","Slap it down anywhere"],["Looks ugly","Looks awesome"],["RNG dependent","Consistent"],["Weak early rounds","Dominates early rounds"],["Struggles to DDTs","DDT shredder"],["Can't pop camo","Camo detection god"],["Can't pop lead","Lead destroyer"],["Useless support","Godly buff"],["Bad footprint","Fits anywhere"],["Terrible pierce","Infinite pierce"]],
+    "Minecraft": [["Useless block","Essential block"],["Ugly build","Masterpiece"],["Annoying mob","Cute mob"],["Noob trap","Pro strat"],["Trash enchantment","God tier enchantment"],["Useless item","Must-have in hotbar"],["Terrible update","Best update ever"],["Boring biome","Beautiful biome"],["Waste of diamonds","Worth the diamonds"],["Easy boss","Hard boss"],["Griefing material","Builder's dream"],["Terrible food source","Best food source"],["Peaceful vibe","Stressful vibe"],["Cluttered inventory","Clean inventory"],["Useless redstone","Genius contraption"],["Terrible terrain gen","Epic terrain gen"],["Boring dimension","Exciting dimension"],["Bad potion","Essential potion"],["Annoying sound","Nostalgic sound"],["Useless villager trade","OP trade"],["Terrible armor","God armor"],["Bad weapon","OP weapon"],["Boring server minigame","Addicting minigame"],["Terrible mod","Must-have mod"],["Ugly texture","Beautiful texture"],["Pointless achievement","Flex achievement"],["Dumb way to die","Epic way to die"]],
+    "Roblox": [["Cash grab","Passion project"],["Slender","Bacon hair"],["Brainrot game","Actually fun"],["Scam gamepass","Worth the Robux"],["Toxic community","Wholesome community"],["Dead game","Currently trending"],["Terrible UI","Clean UI"],["Pay to win","Free to play friendly"],["Cringe roleplay","Good roleplay"],["Annoying audio","Banger soundtrack"],["Copied game","Original concept"],["Too much lag","Well optimized"],["Boring simulator","Addicting simulator"],["Terrible event","Iconic event"],["Ugly avatar","Cool avatar"],["Annoying chat filter","Works perfectly"],["Dumb obby","Creative obby"],["Boring tycoon","Fun tycoon"],["Unfair moderation","Fair moderation"],["Terrible horror game","Actually scary"],["Nostalgic classic","Modern masterpiece"],["Too grindy","Good pacing"],["Exploiter paradise","Secure game"],["Boring combat","Fluid combat"],["Dumb story","Great lore"],["Terrible graphics","Beautiful lighting"],["Useless gear","OP gear"]],
+    "TV Shows": [["Cancelled too soon","Went on too long"],["Filler episode","Peak television"],["Terrible finale","Perfect finale"],["Boring protagonist","Iconic protagonist"],["Bad spin-off","Better than the original"],["Overrated","Underrated"],["Terrible theme song","Banger theme song"],["Fell off in season 2","Got better every season"],["Forgettable cast","Amazing ensemble"],["Bad sitcom","Hilarious sitcom"],["Confusing plot","Brilliantly written"],["Terrible acting","Emmy-worthy"],["Boring drama","Edge of your seat"],["Bad pacing","Binge-worthy"],["Ruined the characters","Great character arc"],["Terrible cliffhanger","Great cliffhanger"],["Bad pilot","Hooked immediately"],["Too episodic","Great serialized story"],["Terrible reboot","Great reboot"],["Guilty pleasure","Prestige TV"],["Bad romance plot","Great chemistry"],["Terrible VFX","Movie-quality effects"],["Forgettable dialogue","Highly quotable"],["Bad worldbuilding","Immersive world"],["Unfunny writing","Sharp writing"],["Terrible villain","Love to hate them"],["Boring setting","Unique setting"]],
+    "Cartoons": [["For toddlers","For everyone"],["Annoying voice","Iconic voice acting"],["Ugly art style","Beautiful animation"],["Terrible reboot","Better than the original"],["Forgot it existed","Nostalgic classic"],["Dumb humor","Smart humor"],["Bad theme song","Absolute banger"],["Boring protagonist","Great main character"],["Terrible villain","Iconic villain"],["Bad moral lesson","Deep message"],["Cancelled too soon","Milked to death"],["Annoying sidekick","Funny sidekick"],["Terrible writing","Peak fiction"],["Bad crossover","Epic crossover"],["Ugly character design","Great character design"],["Boring world","Creative universe"],["Terrible movie adaptation","Great movie adaptation"],["Unfunny gag","Classic running joke"],["Bad pacing","Perfect episode length"],["Forgettable","Cultural impact"],["Too childish","Surprisingly dark"],["Terrible dub","Great voice cast"],["Bad action scenes","Epic fights"],["Terrible sequel series","Great continuation"],["Boring setting","Immersive world"],["Unlikable cast","Loveable cast"]],
+    "Technology": [["Vaporware","Industry standard"],["Overpriced gimmick","Bargain"],["Obsolete","Bleeding edge"],["Useless feature","Quality of life upgrade"],["Terrible battery life","Lasts forever"],["Awful UI","Intuitive design"],["Bloatware","Essential software"],["Terrible build quality","Built like a tank"],["Privacy nightmare","Secure"],["Ugly design","Sleek aesthetics"],["Slow and laggy","Blazing fast"],["Overcomplicated","User-friendly"],["Terrible customer support","Great ecosystem"],["Proprietary garbage","Open source"],["Terrible camera","Professional quality"],["Useless smart home device","Actually helpful"],["Terrible audio quality","Audiophile tier"],["Bad ergonomic design","Super comfortable"],["Terrible connectivity","Reliable connection"],["Overheating mess","Cool and quiet"],["Terrible screen","Beautiful display"],["Useless app","Use it daily"],["Terrible update","Great software patch"],["Bad keyboard","Great typing experience"],["Useless peripheral","Must-have accessory"],["Terrible AI integration","Actually useful AI"]],
+    "Politics": [["Radical","Centrist"],["Authoritarian","Libertarian"],["Wastes tax money","Public good"],["Local issue","Global issue"],["Unpopular opinion","Popular opinion"],["Inefficient","Efficient"],["Corrupt","Transparent"],["Divisive","Unifying"],["Short-term fix","Long-term solution"],["Performative","Impactful"],["Outdated policy","Progressive policy"],["Harmful rhetoric","Constructive debate"],["Scandalous","Squeaky clean"],["Voter apathy","High turnout"],["Partisan hack","Bipartisan"],["Terrible optics","Great PR"],["Lobbyist dream","Grassroots"],["Fearmongering","Hopeful"],["Terrible debate performance","Crushed the debate"],["Empty promise","Kept promise"],["Terrible legislation","Landmark bill"],["Diplomatic disaster","Foreign policy win"],["Economically illiterate","Sound economics"],["Terrible leader","Statesman"],["Echo chamber","Nuanced discussion"]],
+    "Clash Royale": [["Toxic deck","Respected deck"],["Midladder menace","Top ladder pick"],["Needs a nerf immediately","Needs a buff immediately"],["Positive elixir trade","Negative elixir trade"],["Trash win condition","Reliable win condition"],["Useless spell","Essential spell"],["Terrible evolution","OP evolution"],["Skillless card","High skill cap"],["Terrible building","Solid defense"],["Bad starting play","Safe opening"],["Easy to counter","Impossible to defend"],["Trash emote","BM god tier"],["Terrible matchup","Hard counter"],["Useless champion","OP champion"],["Bad synergy","Great combo"],["Terrible cycle","Fast cycle"],["Heavy and clunky","Fluid deck"],["Terrible split lane","Great split pressure"],["Useless on defense","Defensive wall"],["Terrible at bridge","Bridge spam god"],["Waste of gold","Must max out"],["Terrible draft pick","First pick draft"],["Bad clan war deck","Guaranteed win"],["Terrible balance change","Great balance change"],["Useless pass royale","Worth the money"]],
+    "School": [["Bird class","GPA ruiner"],["Useless subject","Essential life skill"],["Strict teacher","Chill teacher"],["Terrible cafeteria food","Actually edible"],["Boring assembly","Fun event"],["Useless assignment","Actually learned something"],["Easy A","Guaranteed fail"],["Terrible group member","Carried the project"],["Annoying rule","Makes sense"],["Terrible textbook","Helpful resource"],["Waste of time","Productive class"],["Terrible schedule","Perfect timetable"],["Stressful exam","Easy test"],["Terrible commute","Easy walk"],["Useless club","Great extracurricular"],["Terrible uniform","Drip"],["Annoying bell ring","Music to my ears"],["Terrible seating chart","Sat next to friends"],["Boring lecture","Engaging lesson"],["Terrible substitute","Fun sub"],["Useless counselor","Helpful advice"],["Terrible gym unit","Dodgeball day"],["Annoying homework","No homework"],["Terrible project","Fun presentation"],["Useless supplies","Must-have stationery"]],
+    "Genshin Impact": [["Easy skip","Must pull"],["Copium artifact","God roll"],["Niche support","Universal battery"],["Whale territory","F2P friendly"],["Terrible weapon banner","Weapon banner scam (but worth it)"],["Boring event","Peak flagship event"],["Annoying enemy","Satisfying to fight"],["Terrible kit","Cohesive design"],["Clunky gameplay","Fluid rotation"],["Terrible constellation","Game-changing C6"],["Useless passive","Exploration god"],["Boring lore","Deep lore"],["Ugly design","Drip marketing winner"],["Terrible standard banner pull","Great standard pull"],["Annoying domain","Fast clear"],["Terrible element","OP reaction"],["Boring region","Beautiful exploration"],["Terrible voice acting","Incredible performance"],["Annoying puzzle","Big brain puzzle"],["Terrible gadget","Quality of life essential"],["Useless material","Always out of it"],["Terrible Abyss rotation","Easy 36 star"],["Boring hangout","Great story quest"],["Terrible scaling","Big PP damage"],["Useless healer","Immortal team"]],
+    "America": [["Deep South","Pacific Northwest"],["Tourist trap","Hidden gem"],["Blue state","Red state"],["Fast food trash","Gourmet dining"],["Flyover state","Major hub"],["Terrible infrastructure","Great public transit"],["Overpriced city","Affordable living"],["Terrible weather","Perfect climate"],["Ugly architecture","Beautiful skyline"],["Boring history","Rich culture"],["Terrible sports team","Dynasty"],["Annoying accent","Charming accent"],["Terrible driver state","Good drivers"],["Boring landscape","Stunning national park"],["Terrible pizza","NY/Chicago tier"],["Corporate wasteland","Small business heaven"],["Terrible airport","Easy connection"],["Boring local event","Massive festival"],["Terrible road trip","Scenic drive"],["Useless landmark","Iconic monument"],["Terrible college town","Great campus vibe"],["Boring suburb","Bustling downtown"],["Terrible BBQ","God tier BBQ"],["Annoying stereotype","Accurate stereotype"],["Terrible legislation","Great state law"]],
+    "Geography": [["Below sea level","High altitude"],["Desolate","Densely populated"],["Flat as a pancake","Mountainous"],["Landlocked","Coastal"],["Freezing cold","Boiling hot"],["Arid desert","Lush rainforest"],["Tiny country","Massive landmass"],["Terrible borders","Clean map lines"],["Boring flag","S-tier flag"],["Terrible natural disasters","Safe haven"],["Poor natural resources","Resource rich"],["Terrible climate","Mediterranean paradise"],["Ugly terrain","Stunning views"],["Terrible infrastructure","Highly developed"],["Boring wildlife","Biodiverse"],["Terrible farming","Breadbasket"],["Isolated","Global crossroads"],["Terrible river access","Major port"],["Boring timezone","Crazy time difference"],["Terrible tectonic placement","Stable plate"],["Useless islands","Strategic archipelago"],["Terrible neighbors","Friendly borders"],["Boring capital","World-class city"],["Terrible map projection","Accurate globe"],["Useless territory","Crucial chokepoint"]],
+    "History": [["Dark Ages","Renaissance"],["Villain","Hero"],["Historically accurate","Total myth"],["Terrible leader","Great conqueror"],["Boring era","Fascinating time period"],["Terrible battle strategy","Military genius"],["Useless invention","Changed the world"],["Forgotten event","Major turning point"],["Terrible empire","Golden age"],["Boring artifact","Priceless treasure"],["Terrible peace treaty","Lasting alliance"],["Senseless war","Justified conflict"],["Terrible living conditions","High standard of living"],["Boring document","Revolutionary text"],["Terrible succession","Smooth transition of power"],["Useless monarch","Enlightened despot"],["Terrible plague","Medical breakthrough"],["Boring architecture","Wonder of the world"],["Terrible trade route","Silk Road tier"],["Useless propaganda","Effective campaign"],["Terrible revolution","Successful uprising"],["Boring speech","Iconic words"],["Terrible historical movie","Great period piece"],["Useless armor","Impenetrable defense"],["Terrible historical figure","Misunderstood genius"]],
+    "Chess": [["Blunder","Brilliant (!!)"],["Closed position","Open position"],["Boring opening","Aggressive gambit"],["Terrible endgame","Flawless technique"],["Useless piece","OP knight outpost"],["Terrible time management","Bullet god"],["Boring draw","Exciting decisive game"],["Terrible pawn structure","Solid chain"],["Useless trap","Devastating tactic"],["Terrible engine evaluation","Mate in 3"],["Boring theoretical line","Wild novelty"],["Terrible king safety","Castled snug"],["Useless bishop","Sniper on the long diagonal"],["Terrible pin","Crushing skewer"],["Boring positional play","Tactical bloodbath"],["Terrible sacrifice","Tal-esque sac"],["Useless development","Lead in development"],["Terrible square","Key outpost"],["Boring commentary","Hype cast"],["Terrible notation","Beautiful sequence"],["Useless fork","Royal fork"],["Terrible mating net","Smothered mate"],["Boring chess variant","Crazyhouse"],["Terrible grandmaster","World Champion tier"],["Useless calculation","Saw 10 moves ahead"]],
+    "AI Models And Prompting": [["Hallucination","Factual"],["Vague prompt","Mega-prompt"],["Robotic tone","Human-like"],["Useless output","Perfect response"],["Terrible context window","Infinite memory"],["Boring system prompt","Creative persona"],["Terrible formatting","Markdown god"],["Useless jailbreak","Completely unfiltered"],["Terrible reasoning","Chain of thought genius"],["Boring use case","Revolutionary workflow"],["Terrible token efficiency","Highly optimized"],["Useless code generation","Zero-bug script"],["Terrible creative writing","Bestseller quality"],["Boring default style","Highly specific tone"],["Terrible image generation","Photorealistic masterpiece"],["Useless agent","Autonomous assistant"],["Terrible fine-tuning","Perfect alignment"],["Boring parameters","Temperature 1.0 chaos"],["Terrible latency","Instant response"],["Useless summarization","Perfect TL;DR"],["Terrible data set","High-quality training"],["Boring interaction","Engaging conversation"],["Terrible logic puzzle","Nailed the trick question"],["Useless translation","Native fluency"],["Terrible integration","Seamless API"]],
+    "Pokemon": [["Trash tier design","God tier design"],["Route 1 trash","Pseudo-legendary"],["Weak typing","OP typing"],["Terrible shiny","Gorgeous shiny"],["Useless ability","Broken ability"],["Terrible stats","Uber tier"],["Boring evolution","Epic glow-up"],["Terrible signature move","Must-have attack"],["Useless HM","Essential field move"],["Terrible generation","Peak Pokemon era"],["Boring legendary","Iconic box art cover"],["Terrible gym leader","Challenging fight"],["Useless item","Choice Band tier"],["Terrible villain team","Actually threatening evil team"],["Boring region","Immersive map"],["Terrible rival","Pushes you to be better"],["Useless nature","Optimal nature"],["Terrible gimmick","Mega Evolution tier"],["Boring anime episode","Epic battle scene"],["Terrible spin-off","Mystery Dungeon tier"],["Useless egg move","Crucial coverage"],["Terrible encounter rate","Everywhere"],["Boring shiny hunt","Thrilling phase"],["Terrible champion","Cynthia tier"],["Useless lore","Deep pokedex entry"]],
+    "Crime": [["Petty theft","Heinous crime"],["Unsolved mystery","Open and shut case"],["White collar","Blue collar"],["Terrible alibi","Air-tight excuse"],["Useless evidence","Smoking gun"],["Terrible motive","Complex psychology"],["Boring trial","Courtroom drama"],["Terrible detective","Sherlock Holmes tier"],["Useless witness","Key testimony"],["Terrible getaway","Perfect heist"],["Boring true crime doc","Gripping series"],["Terrible forensic work","DNA match"],["Useless sketch","Spitting image"],["Terrible defense","Acquitted"],["Boring interrogation","Cracked under pressure"],["Terrible sentence","Justice served"],["Useless profiling","Spot-on analysis"],["Terrible crime scene","Meticulously planned"],["Boring fraud","Massive Ponzi scheme"],["Terrible cybercrime","Master hacker"],["Useless accomplice","Mastermind"],["Terrible blackmail","Devastating leverage"],["Boring vandalism","Art heist"],["Terrible smuggling","Cartel level"],["Useless cold case","Finally solved"]],
+    "Psychology": [["Nature","Nurture"],["Introvert","Extrovert"],["Placebo","Real effect"],["Terrible coping mechanism","Healthy habit"],["Cognitive bias","Rational thought"],["Terrible self-esteem","Narcissist"],["Boring dream","Lucid nightmare"],["Terrible therapy","Breakthrough session"],["Useless personality test","Highly accurate assessment"],["Terrible condition","Neurodivergent superpower"],["Boring study","Groundbreaking experiment"],["Terrible motivation","Intrinsic drive"],["Useless habit","Atomic habit"],["Terrible communication","Active listening"],["Boring emotion","Overwhelming passion"],["Terrible memory","Photographic recall"],["Useless reflex","Conditioned response"],["Terrible focus","Flow state"],["Boring subconscious","Deeply repressed"],["Terrible group dynamic","Mob mentality"],["Useless trigger","Trauma response"],["Terrible empathy","Deeply compassionate"],["Boring phobia","Terrifying fear"],["Terrible manipulation","Gaslighting master"],["Useless schema","Core belief"]],
+    "English": [["Grammatical nightmare","Poetic masterpiece"],["Slang","Formal"],["Overused word","Obscure vocabulary"],["Terrible spelling","Easy to spell"],["Boring sentence","Beautiful prose"],["Terrible punctuation","Perfectly placed comma"],["Useless idiom","Great metaphor"],["Terrible essay","A+ paper"],["Boring reading assignment","Page-turner"],["Terrible dialect","Charming accent"],["Useless synonym","Perfect word choice"],["Terrible rhyme","Sick bars"],["Boring cliché","Original thought"],["Terrible typo","Hilarious autocorrect"],["Useless prefix","Changes the whole meaning"],["Terrible translation","Lost in translation"],["Boring small talk","Deep conversation"],["Terrible handwriting","Calligraphy"],["Useless acronym","Everyone knows it"],["Terrible pronunciation","Sounds fancy"],["Boring transition","Seamless flow"],["Terrible passive voice","Strong active voice"],["Useless jargon","Industry standard"],["Terrible haiku","Beautiful poem"],["Boring protagonist name","Iconic character name"]],
+    "Discord": [["Dead server","Active chat"],["@everyone abuser","Never pings"],["Toxic mod","Chill admin"],["Terrible bot","Essential integration"],["Boring VC","Hilarious voice call"],["Terrible emote","Server favorite emoji"],["Useless channel","Main general chat"],["Terrible role setup","Clean hierarchy"],["Boring profile picture","Matching pfps"],["Terrible status","Funny custom status"],["Useless nitro feature","Worth the boost"],["Terrible soundboard","Spammed audio"],["Boring stream","Watch party"],["Terrible argument","Keyboard warrior"],["Useless webhook","Great automation"],["Terrible UI update","Clean redesign"],["Boring event","Massive giveaway"],["Terrible alt account","Main account"],["Useless dm","Late night deep talk"],["Terrible server icon","Great branding"],["Boring bio","Cringe about me"],["Terrible raid","Well-defended"],["Useless thread","Organized discussion"],["Terrible ping delay","Zero lag"],["Boring connection","Spotify listener"]],
+    "Youtube": [["Clickbait trash","High effort essay"],["Fell off","Peaking"],["Brainrot","Educational"],["Terrible thumbnail","High CTR"],["Boring intro","Hooked in 5 seconds"],["Terrible sponsor read","Actually funny ad"],["Useless comment","Pinned top comment"],["Terrible apology video","Genuine accountability"],["Boring vlog","Cinematic masterpiece"],["Terrible gaming channel","Nostalgic let's play"],["Useless tutorial","Saved my life"],["Terrible drama","Entertaining beef"],["Boring reaction","Adds actual value"],["Terrible short","Viral loop"],["Useless livestream","Hype chat"],["Terrible editing","God tier montage"],["Boring outro","Great call to action"],["Terrible unboxing","Satisfying review"],["Useless tier list","Factually correct ranking"],["Terrible prank","Wholesome joke"],["Boring challenge","MrBeast tier"],["Terrible music cover","Better than the original"],["Useless lore video","Deep dive"],["Terrible algorithm","Recommended masterpiece"],["Boring podcast","Great conversation"]],
+    "Children": [["iPad kid","Tree climber"],["Picky eater","Eats anything"],["Tantrum thrower","Angel"],["Terrible toy","Nostalgic classic"],["Boring cartoon","Actually good show"],["Terrible bedtime routine","Sleeps through the night"],["Useless baby gear","Parenting lifesaver"],["Terrible mess","Clean room"],["Boring playground","Epic park"],["Terrible school project","Refrigerator-worthy art"],["Useless imaginary friend","Creative genius"],["Terrible phase","Growing up too fast"],["Boring bedtime story","Classic fairy tale"],["Terrible babysitter","Favorite nanny"],["Useless chore","Actually helpful"],["Terrible sibling rivalry","Best friends"],["Boring lunchbox","Traded for the best snack"],["Terrible meltdown","Quickly distracted"],["Useless pacifier","Instant silence"],["Terrible timeout","Learned their lesson"],["Boring playdate","Chaos"],["Terrible question","Philosophical toddler"],["Useless craft","Cute memory"],["Terrible lie","Obvious fib"],["Boring outfit","Dressed themselves"]],
+    "Superheroes": [["Useless sidekick","Main hero"],["Weakness is dumb","Invincible"],["Marvel","DC"],["Terrible origin story","Tragic and epic"],["Boring villain","Complex antagonist"],["Terrible costume","Iconic suit"],["Useless superpower","God tier ability"],["Terrible movie","Box office smash"],["Boring comic run","Legendary arc"],["Terrible secret identity","Billionaire playboy"],["Useless gadget","Utility belt essential"],["Terrible base","Fortress of Solitude"],["Boring romance","Iconic couple"],["Terrible reboot","Saved the cinematic universe"],["Useless team member","Carries the Justice League"],["Terrible CGI fight","Epic choreography"],["Boring catchphrase","Iconic quote"],["Terrible crossover","Infinity War tier"],["Useless mentor","Wise father figure"],["Terrible sacrifice","Heroic death"],["Boring anti-hero","Edgy but cool"],["Terrible redemption arc","Deserved forgiveness"],["Useless magic","Reality warping"],["Terrible multiverse","Cool alternate variant"],["Boring daily bugle","Front page news"]],
+    "Anime": [["Trash isekai","Peak fiction"],["100+ episodes of filler","All canon"],["Subbed","Dubbed"],["Terrible animation","Ufotable tier"],["Boring protagonist","Shonen goat"],["Terrible OP","Skipping is a crime"],["Useless side character","Fan favorite"],["Terrible ending","Masterpiece finale"],["Boring tournament arc","Hype battles"],["Terrible power scaling","Makes perfect sense"],["Useless training arc","Massive powerup"],["Terrible CGI","Beautiful 2D"],["Boring waifu/husbando","Best girl/boy"],["Terrible adaptation","Better than the manga"],["Useless flashback","Tragic backstory"],["Terrible villain motive","He was right"],["Boring worldbuilding","Immersive universe"],["Terrible pacing","Binge-worthy"],["Useless transformation","Epic new form"],["Terrible plot armor","Actually lost"],["Boring romance subplot","Better than the main plot"],["Terrible beach episode","Essential plot"],["Useless comic relief","Actually hilarious"],["Terrible ED","Banger ending song"],["Boring trope","Deconstructed the genre"]],
+    "Niche Anime": [["Cult classic","Completely forgotten"],["Pretentious","Masterpiece"],["Slice of Life","Mecha"],["Terrible avant-garde","Mind-bending genius"],["Boring slow burn","Incredible payoff"],["Terrible sub on VHS","Nostalgic 90s aesthetic"],["Uselessly edgy","Deep psychological horror"],["Terrible character design","Unique art style"],["Boring dialogue heavy","Tarantino-esque script"],["Terrible pacing","Atmospheric masterpiece"],["Useless symbolism","Deep meaning"],["Terrible soundtrack","Jazz/Lofi god tier"],["Boring sports anime","Hype as hell"],["Terrible idol show","Surprisingly dark"],["Useless fan service","Actually part of the plot"],["Terrible episodic format","Great monster of the week"],["Boring light novel title","Actually peak"],["Terrible magical girl","Madoka tier"],["Useless cliffhanger","Maddening suspense"],["Terrible dub","Ghost Stories level dub"],["Boring world","Incredible sci-fi setting"],["Terrible obscure reference","Genius homage"],["Uselessly cute","Iyashikei healing"],["Terrible budget","Passion project animation"],["Boring OVA","Essential viewing"]],
+    "Pop Culture": [["Fad","Timeless"],["Overrated celebrity","Underrated icon"],["Cancelled","Beloved"],["Terrible trend","Cultural reset"],["Boring red carpet","Iconic look"],["Terrible award show","Deserved the Oscar"],["Useless influencer","Actually talented"],["Terrible meme","Internet heritage"],["Boring gossip","Scandal of the decade"],["Terrible viral challenge","Harmless fun"],["Useless reality show","Peak trash TV"],["Terrible comeback","Legendary return"],["Boring fandom","Crazy stans"],["Terrible brand deal","Secured the bag"],["Useless aesthetic","Vibe shift"],["Terrible era","Peak era"],["Boring chart topper","Song of the summer"],["Terrible apology notes app","Genuine accountability"],["Useless nepo baby","Actually proved themselves"],["Terrible quote","Added to the dictionary"],["Boring paparazzi pic","Broken the internet"],["Terrible fashion trend","Drip"],["Useless hashtag","Movement"],["Terrible crossover","Barbenheimer"],["Boring nostalgia","Perfect throwback"]]
+  };
 
   /* ---------------- tiny utils ---------------- */
   function $(id){ return document.getElementById(id); }
@@ -466,15 +473,15 @@
   // canonical game state (lives on host only)
   var state = {
     hostId: null,
-    players: {},          // id -> {id, name, online}
-    playerOrder: [],      // tracks active players for circulating rounds seamlessly
+    players: {},          
+    playerOrder: [],      
     psychicId: null,
-    phase: "idle",        // idle | choosing | playing | revealed
+    phase: "idle",        
     topic: null,           
     target: null,         
-    guesses: {},          // pid -> value
-    locks: {},            // pid -> locked (bool)
-    scores: {},           // pid -> total score
+    guesses: {},          
+    locks: {},            
+    scores: {},           
     lastResult: null,
     history: []
   };
@@ -610,13 +617,12 @@
     var isPsy = (peerId === state.psychicId);
     var visibleGuesses = {};
     
-    // Manage who sees whose markers mid-round
     if (state.phase === "playing") {
       if (isPsy) {
-        visibleGuesses = state.guesses; // psychic sees all moving live
+        visibleGuesses = state.guesses; 
       } else {
         if (state.guesses[peerId] !== undefined) {
-          visibleGuesses[peerId] = state.guesses[peerId]; // player only sees theirs
+          visibleGuesses[peerId] = state.guesses[peerId]; 
         }
       }
     }
@@ -678,7 +684,6 @@
     var currentIdx = state.playerOrder.indexOf(state.psychicId);
     var nextIdx = (currentIdx + 1) % state.playerOrder.length;
     var loopCount = 0;
-    // Skip players who are offline
     while (!state.players[state.playerOrder[nextIdx]].online && loopCount < state.playerOrder.length) {
         nextIdx = (nextIdx + 1) % state.playerOrder.length;
         loopCount++;
@@ -776,7 +781,6 @@
     });
     conn.on("close", function(){
       delete connections[conn.peer];
-      
       if (state.players[conn.peer]) {
           state.players[conn.peer].online = false;
       }
@@ -834,13 +838,11 @@
   /* Connection Keepalive Heartbeat */
   setInterval(function(){
     if (isHost) {
-      // Host pings everyone to keep NAT tables alive and verify connectivity
       var pmsg = JSON.stringify({t:"ping"});
       for (var pid in connections) {
         if (connections[pid].open) connections[pid].send(pmsg);
       }
     } else if (hostConn && hostConn.open) {
-      // If client hears nothing from host for 6 seconds, assume dead and trigger auto-reconnect
       if (Date.now() - lastMsgTime > 6000) {
         hostConn.close(); 
       }
@@ -943,7 +945,6 @@
   function renderPanel(view){
     var key = structKey(view);
     if(view.phase === "playing" && key === panelStructKey){
-      // fast path: dynamically update only active slider(s) without trashing capturing limits 
       for(var pid in view.guesses){
         if(puckRefs[pid]){
           puckRefs[pid].style.left = clamp(view.guesses[pid],0,100) + "%";
@@ -1008,11 +1009,26 @@
       row.appendChild(inB);
       wrap.appendChild(row);
 
-      var randRow = el("div","row");
-      var randBtn = el("button","btn btn-ghost btn-sm","🎲 Random topic");
+      var randRow = el("div","category-select-wrapper");
+      
+      var catSelect = document.createElement("select");
+      var optAll = document.createElement("option");
+      optAll.value = "All"; optAll.textContent = "All Categories";
+      catSelect.appendChild(optAll);
+      
+      Object.keys(TOPICS).forEach(function(cat){
+        var o = document.createElement("option");
+        o.value = cat; o.textContent = cat;
+        catSelect.appendChild(o);
+      });
+      randRow.appendChild(catSelect);
+
+      var randBtn = el("button","btn btn-ghost btn-sm","🎲 Random");
       randBtn.type = "button";
       randBtn.addEventListener("click", function(){
-        var pick = TOPICS[Math.floor(Math.random()*TOPICS.length)];
+        var selCat = catSelect.value;
+        var list = (selCat === "All") ? Object.values(TOPICS).reduce((acc, val) => acc.concat(val), []) : TOPICS[selCat];
+        var pick = list[Math.floor(Math.random()*list.length)];
         inA.value = pick[0]; inB.value = pick[1];
       });
       randRow.appendChild(randBtn);
@@ -1023,7 +1039,8 @@
       startBtn.addEventListener("click", function(){
         var a = inA.value.trim(), b = inB.value.trim();
         if(!a || !b){
-          var pick = TOPICS[Math.floor(Math.random()*TOPICS.length)];
+          var allT = Object.values(TOPICS).reduce((acc, val) => acc.concat(val), []);
+          var pick = allT[Math.floor(Math.random()*allT.length)];
           a = a || pick[0]; b = b || pick[1];
         }
         sendAction({t:"startRound", a:a, b:b});
@@ -1037,7 +1054,6 @@
       msg.appendChild(el("h2",null, psyName + " is picking a topic…"));
       msg.appendChild(el("p",null,"Hang tight — the round starts as soon as they lock in a spectrum."));
       
-      // AFK Skip Button specifically for the Host
       if (view.isRoomHost) {
         var hostCtrl = el("div", "host-controls");
         var skipBtn = el("button", "btn-host", "Host: Skip their turn (AFK)");
@@ -1045,7 +1061,6 @@
         hostCtrl.appendChild(skipBtn);
         msg.appendChild(hostCtrl);
       }
-
       return msg;
     }
   }
@@ -1070,7 +1085,7 @@
   function buildTrack(view, opts){
     var wrap = el("div","track-wrap");
     var track = el("div","track" + (opts.locked ? " disabled" : ""));
-    var trackInner = el("div", "track-inner"); // strictly clips the bands, allows markers to exist outside
+    var trackInner = el("div", "track-inner"); 
     track.appendChild(trackInner);
 
     if(opts.showTarget && view.target != null){
@@ -1142,7 +1157,7 @@
     function onMove(evt){
       if(!dragging) return;
       var pct = pctFromEvent(evt);
-      moveLocalPuck(pct); // zero-latency local feedback
+      moveLocalPuck(pct);
       sendAction({t:"drag", value: pct});
       evt.preventDefault();
     }
@@ -1157,7 +1172,6 @@
     track.addEventListener("pointerup", onUp);
     track.addEventListener("pointercancel", onUp);
     
-    // keyboard support
     puck.addEventListener("keydown", function(evt){
       if(currentView && currentView.myLock) return;
       var step = evt.shiftKey ? 10 : 2;
@@ -1235,7 +1249,6 @@
     }
     wrap.appendChild(controls);
 
-    // Host Force Reveal Button
     if (view.isRoomHost) {
       var hostCtrl = el("div", "host-controls");
       var fRevBtn = el("button", "btn-host", "Host: Force Reveal");
@@ -1286,12 +1299,9 @@
       star.style.left = r.target + "%";
       track.appendChild(star);
       
-      // Calculate staggering offsets for overlapping pucks so none are hidden
       var placedPucks = [];
       for (var pid in r.results) {
         var guess = r.results[pid].guess;
-        
-        // See if someone else is already at almost this exact spot
         var closeCount = 0;
         for (var i=0; i < placedPucks.length; i++) {
            if (Math.abs(placedPucks[i] - guess) <= 3) closeCount++; 
@@ -1301,11 +1311,9 @@
         var puck = el("div","puck locked");
         puck.style.left = guess + "%";
 
-        // Stack perfectly overlapping pucks downwards
         if (closeCount > 0) {
-            puck.style.marginTop = (closeCount * 34) + "px"; // Shift down visually
+            puck.style.marginTop = (closeCount * 34) + "px"; 
             puck.style.zIndex = 10 + closeCount;
-            // Pad the container dynamically if we stack too many to stop them running into text
             trackWrap.style.paddingBottom = Math.max(6, (closeCount * 34) + 6) + "px"; 
         }
 
@@ -1330,19 +1338,15 @@
     trackWrap.appendChild(track);
     wrap.appendChild(trackWrap);
 
-    // Everyone's Guesses Summary breakdown list
     var breakdown = el("div", "reveal-breakdown");
     if (r && r.results) {
       for (var pid in r.results) {
         var pl = view.players[pid];
         var name = pl ? pl.name : "Someone";
-        
         var pill = el("div", "breakdown-pill");
         var dot = el("span", "dot");
         dot.style.background = nameColor(name);
-        
         var text = el("span", null, name + " • " + r.results[pid].points + " pts");
-        
         pill.appendChild(dot);
         pill.appendChild(text);
         breakdown.appendChild(pill);
