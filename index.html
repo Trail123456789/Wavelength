@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Wavelength Sync — remote signal-guessing game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg:#10171b;
+    --bg-deep:#0a0f12;
+    --panel:#182124;
+    --panel-raised:#1f2a2e;
+    --track-groove:#0b1114;
+    --line:#2a363b;
+    --amber:#ffb454;
+    --amber-dim:#8a672f;
+    --teal:#5eead4;
+    --teal-dim:#2f6e64;
+    --text:#f3efe6;
+    --text-muted:#93a3a8;
+    --text-faint:#5c6b70;
+    --danger:#e08585;
+    --radius-lg:22px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+    --shadow-card:0 20px 50px -20px rgba(0,0,0,0.6);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 700px at 15% -10%, rgba(255,180,84,0.08), transparent 60%),
+      radial-gradient(1000px 700px at 100% 110%, rgba(94,234,212,0.06), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    -webkit-tap-highlight-color:transparent;
+    min-height:100%;
+    display:flex;
+    justify-content:center;
+  }
+  #app{
+    width:100%;
+    max-width:720px;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    padding:max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+  }
+  button{
+    font-family:var(--font-body);
+    cursor:pointer;
+    border:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+    outline:2px solid var(--teal);
+    outline-offset:2px;
+  }
+  input{
+    font-family:var(--font-body);
+    background:var(--track-groove);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:var(--radius-sm);
+    padding:11px 13px;
+    font-size:15px;
+  }
+  input::placeholder{color:var(--text-faint);}
+  .hidden{display:none !important;}
+
+  /* ---------- shared bits ---------- */
+  .wordmark{
+    font-family:var(--font-display);
+    font-weight:700;
+    letter-spacing:0.02em;
+  }
+  .eyebrow{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+  }
+  .btn{
+    font-weight:600;
+    font-size:15px;
+    border-radius:999px;
+    padding:14px 22px;
+    transition:transform .12s ease, filter .12s ease, opacity .12s ease;
+  }
+  .btn:active{transform:scale(0.97);}
+  .btn:disabled{opacity:0.35; cursor:not-allowed; transform:none;}
+  .btn-primary{background:linear-gradient(180deg,#ffc372,var(--amber)); color:#241608;}
+  .btn-primary:hover:not(:disabled){filter:brightness(1.06);}
+  .btn-ghost{background:var(--panel-raised); color:var(--text); border:1px solid var(--line);}
+  .btn-ghost:hover:not(:disabled){border-color:var(--teal-dim);}
+  .btn-teal{background:linear-gradient(180deg,#7ff3df,var(--teal)); color:#052b25;}
+  .btn-sm{padding:10px 16px; font-size:13.5px;}
+  .btn-block{width:100%;}
+
+  /* ---------- landing ---------- */
+  #screen-landing{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:34px;
+    padding:20px 4px 40px;
+  }
+  .hero{text-align:center; display:flex; flex-direction:column; align-items:center; gap:14px;}
+  .hero .wordmark{font-size:clamp(30px,7vw,42px); line-height:1;}
+  .hero .wordmark span{color:var(--amber);}
+  .hero p{color:var(--text-muted); font-size:14.5px; max-width:340px; margin:0;}
+  .signal{
+    width:100%;
+    max-width:320px;
+    height:64px;
+    position:relative;
+  }
+  .signal svg{width:100%;height:100%;display:block;}
+  .signal .ping{
+    transform-origin:center;
+    animation:ping 2.6s ease-out infinite;
+  }
+  .signal .ping.d2{animation-delay:.65s;}
+  .signal .ping.d3{animation-delay:1.3s;}
+  @keyframes ping{
+    0%{opacity:.55; transform:scaleX(0.05);}
+    75%{opacity:0;}
+    100%{opacity:0; transform:scaleX(1);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .signal .ping{animation:none; opacity:.25;}
+  }
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    padding:22px;
+    box-shadow:var(--shadow-card);
+  }
+  .landing-actions{display:flex; flex-direction:column; gap:12px;}
+  .landing-tabs{display:flex; gap:8px; background:var(--track-groove); padding:4px; border-radius:999px; margin-bottom:18px;}
+  .landing-tab{flex:1; text-align:center; padding:10px 12px; border-radius:999px; background:transparent; color:var(--text-muted); font-weight:600; font-size:14px;}
+  .landing-tab.active{background:var(--panel-raised); color:var(--text);}
+  .field{display:flex; flex-direction:column; gap:6px; margin-bottom:14px;}
+  .field label{font-size:12.5px; color:var(--text-muted); font-weight:600;}
+  .field input{width:100%;}
+  .mono-input{font-family:var(--font-mono); letter-spacing:0.12em; text-transform:uppercase;}
+  .form-error{color:var(--danger); font-size:13px; min-height:18px; margin:-6px 0 8px;}
+  .fineprint{color:var(--text-faint); font-size:12.5px; line-height:1.5; text-align:center; max-width:360px; margin:0 auto;}
+
+  /* ---------- top bar ---------- */
+  #screen-game{flex:1; display:none; flex-direction:column; gap:16px;}
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-md);
+    padding:12px 14px;
+  }
+  .room-pill{display:flex; align-items:center; gap:9px;}
+  .room-pill .dot{width:8px;height:8px;border-radius:50%; background:var(--teal); box-shadow:0 0 8px var(--teal);}
+  .room-pill .dot.off{background:var(--danger); box-shadow:none;}
+  .room-code{font-family:var(--font-mono); font-size:15px; letter-spacing:0.1em; font-weight:700;}
+  .room-code-btn{background:none; color:var(--text); display:flex; align-items:center; gap:8px; padding:4px;}
+  .players{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
+  .chip{
+    width:30px; height:30px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-mono); font-size:12px; font-weight:700; color:#0a0f12;
+    border:2px solid var(--panel);
+  }
+  .chip.psy{box-shadow:0 0 0 2px var(--amber);}
+  .toast{
+    font-size:13px; color:var(--danger); background:rgba(224,133,133,0.1);
+    border:1px solid rgba(224,133,133,0.3); border-radius:var(--radius-sm);
+    padding:9px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px;
+  }
+  .toast button{background:var(--danger); color:#2a0e0e; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700;}
+
+  .scorebar{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-md);
+    padding:11px 16px;
+  }
+  .scorebar .total{font-family:var(--font-display); font-weight:700; font-size:18px;}
+  .scorebar .total span{color:var(--amber);}
+  .history{display:flex; gap:6px; overflow-x:auto; max-width:55%;}
+  .history::-webkit-scrollbar{display:none;}
+  .hist-pip{
+    flex:none; width:26px; height:26px; border-radius:8px; font-family:var(--font-mono);
+    font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;
+    background:var(--track-groove); color:var(--text-muted); border:1px solid var(--line);
+  }
+  .hist-pip.p4{background:var(--amber); color:#241608; border-color:var(--amber);}
+  .hist-pip.p3{background:rgba(255,180,84,0.55); color:#241608; border-color:transparent;}
+  .hist-pip.p2{background:rgba(255,180,84,0.28); color:var(--text); border-color:transparent;}
+
+  /* ---------- main panel ---------- */
+  .panel{
+    flex:1; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-lg);
+    padding:24px 20px; display:flex; flex-direction:column; gap:20px; box-shadow:var(--shadow-card);
+    min-height:280px;
+  }
+  .state-msg{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; gap:16px; padding:10px;
+  }
+  .state-msg .big-emoji{font-size:34px;}
+  .state-msg h2{font-family:var(--font-display); margin:0; font-size:19px;}
+  .state-msg p{color:var(--text-muted); font-size:14px; margin:0; max-width:320px; line-height:1.5;}
+
+  .topic-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .topic-label{
+    font-family:var(--font-display); font-weight:600; font-size:clamp(13px,3.6vw,16px);
+    max-width:44%; line-height:1.25;
+  }
+  .topic-label.a{text-align:left; color:var(--teal);}
+  .topic-label.b{text-align:right; color:var(--amber);}
+
+  .track-wrap{position:relative; padding:22px 4px 6px;}
+  .track{
+    position:relative; height:16px; border-radius:999px;
+    background:var(--track-groove);
+    border:1px solid var(--line);
+    touch-action:none;
+    overflow:hidden;
+  }
+  .track.disabled{opacity:0.55;}
+  .zone{position:absolute; top:0; bottom:0; border-radius:2px;}
+  .puck{
+    position:absolute; top:50%; width:30px; height:30px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #fff, var(--teal) 60%);
+    box-shadow:0 0 0 4px rgba(94,234,212,0.18), 0 4px 14px rgba(0,0,0,0.5);
+    transform:translate(-50%,-50%);
+    transition:box-shadow .15s ease;
+    z-index:3;
+  }
+  .puck.held{box-shadow:0 0 0 7px rgba(94,234,212,0.28), 0 4px 14px rgba(0,0,0,0.5);}
+  .puck.locked{background:radial-gradient(circle at 35% 30%, #fff, var(--text-faint) 65%);}
+  .target-mark{
+    position:absolute; top:-8px; bottom:-8px; width:3px; background:var(--amber);
+    box-shadow:0 0 10px var(--amber); transform:translateX(-50%); z-index:2; border-radius:2px;
+  }
+  .target-star{
+    position:absolute; top:50%; width:14px; height:14px; transform:translate(-50%,-50%) rotate(45deg);
+    background:var(--amber); box-shadow:0 0 12px var(--amber); z-index:2; border-radius:3px;
+  }
+  .drag-hint{
+    position:absolute; left:50%; top:-2px; transform:translate(-50%,-100%);
+    font-family:var(--font-mono); font-size:11px; color:var(--text-faint); white-space:nowrap;
+  }
+
+  .role-line{display:flex; align-items:center; gap:10px; justify-content:center; text-align:center;}
+  .role-line .avatar-dot{width:9px;height:9px;border-radius:50%;}
+  .role-line span{font-size:13.5px; color:var(--text-muted);}
+  .role-line b{color:var(--text); font-weight:600;}
+
+  .controls{display:flex; gap:10px; flex-wrap:wrap;}
+  .controls .btn{flex:1; min-width:130px;}
+
+  .topic-picker{display:flex; flex-direction:column; gap:12px;}
+  .topic-picker .row{display:flex; gap:10px;}
+  .topic-picker .row input{flex:1; min-width:0;}
+  .swap-btn{background:var(--panel-raised); color:var(--text-muted); border-radius:999px; padding:0 12px; font-size:15px;}
+
+  .reveal-box{display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;}
+  .points-badge{
+    font-family:var(--font-display); font-weight:700; font-size:38px; color:var(--amber);
+    text-shadow:0 0 24px rgba(255,180,84,0.4);
+  }
+  .points-badge.zero{color:var(--text-faint); text-shadow:none;}
+  .reveal-sub{color:var(--text-muted); font-size:13.5px;}
+
+  footer.hint{
+    text-align:center; color:var(--text-faint); font-size:12px; padding:6px 0 2px;
+  }
+
+  @media (max-width:380px){
+    .controls .btn{min-width:100%;}
+    .topic-label{max-width:48%;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ======================= LANDING ======================= -->
+  <section id="screen-landing">
+    <div class="hero">
+      <div class="signal" aria-hidden="true">
+        <svg viewBox="0 0 320 64">
+          <line x1="20" y1="32" x2="300" y2="32" stroke="#2a363b" stroke-width="2"/>
+          <circle class="ping" cx="160" cy="32" r="26" fill="none" stroke="#ffb454" stroke-width="2"/>
+          <circle class="ping d2" cx="160" cy="32" r="26" fill="none" stroke="#ffb454" stroke-width="2"/>
+          <circle class="ping d3" cx="160" cy="32" r="26" fill="none" stroke="#ffb454" stroke-width="2"/>
+          <circle cx="160" cy="32" r="7" fill="#ffb454"/>
+        </svg>
+      </div>
+      <div class="wordmark">WAVE<span>//</span>LENGTH</div>
+      <p>A tactile point-A-to-point-B guessing game, synced live across everyone's screen. Made for playing over a Discord call.</p>
+    </div>
+
+    <div class="card">
+      <div class="landing-tabs">
+        <button class="landing-tab active" id="tab-host" type="button">Host a room</button>
+        <button class="landing-tab" id="tab-join" type="button">Join a room</button>
+      </div>
+
+      <div id="pane-host">
+        <div class="field">
+          <label for="host-name">Your name</label>
+          <input id="host-name" maxlength="18" placeholder="e.g. Zee" autocomplete="off">
+        </div>
+        <div class="form-error" id="host-error"></div>
+        <button class="btn btn-primary btn-block" id="btn-create-room" type="button">Create room</button>
+      </div>
+
+      <div id="pane-join" class="hidden">
+        <div class="field">
+          <label for="join-name">Your name</label>
+          <input id="join-name" maxlength="18" placeholder="e.g. Sam" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="join-code">Room code</label>
+          <input id="join-code" class="mono-input" maxlength="5" placeholder="ABCDE" autocomplete="off">
+        </div>
+        <div class="form-error" id="join-error"></div>
+        <button class="btn btn-teal btn-block" id="btn-join-room" type="button">Join room</button>
+      </div>
+    </div>
+
+    <p class="fineprint">No installs, no accounts, nothing to host or pay for. Send this same file to your friends — everyone opens it in their own browser and one person shares a room code.</p>
+  </section>
+
+  <!-- ======================= GAME ======================= -->
+  <section id="screen-game">
+    <div class="topbar">
+      <button class="room-code-btn" id="btn-copy-code" type="button" title="Copy room code">
+        <span class="dot" id="conn-dot"></span>
+        <span class="room-code" id="room-code-display">— — — —</span>
+      </button>
+      <div class="players" id="player-chips"></div>
+    </div>
+
+    <div id="conn-toast" class="toast hidden">
+      <span id="conn-toast-text">Connection lost.</span>
+      <button id="btn-reconnect" type="button">Reconnect</button>
+    </div>
+
+    <div class="scorebar">
+      <div class="total">⚡ <span id="total-score">0</span> pts</div>
+      <div class="history" id="history-row"></div>
+    </div>
+
+    <div class="panel" id="main-panel">
+      <!-- filled by renderApp() -->
+    </div>
+
+    <footer class="hint">Give your clue out loud over Discord — this screen just holds the shared marker.</footer>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- config ---------------- */
+  var ROOM_PREFIX = "wvlen-sync-";
+  var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
+  var ZONES = [ {max:2, pts:4}, {max:5, pts:3}, {max:12.5, pts:2} ];
+  // Approximates the physical Wavelength dial: published reviews of the
+  // game describe the colored target wedge as covering roughly a quarter
+  // of the dial's width, narrowing toward the center in 4/3/2-point bands.
+  // 12.5% on each side of the target = 25% of the scale total.
+
+  var TOPICS = [
+    ["Bad idea at work","Great idea at work"],
+    ["Overrated","Underrated"],
+    ["Terrible first date","Perfect first date"],
+    ["Boring superpower","Amazing superpower"],
+    ["Chaotic energy","Calm energy"],
+    ["Bad Minecraft build","Good Minecraft build"],
+    ["Mild inconvenience","Actual disaster"],
+    ["Niche hobby","Mainstream hobby"],
+    ["Would never eat it","Would eat it daily"],
+    ["Villain origin story","Hero origin story"],
+    ["Forgettable movie","Instant classic"],
+    ["Too spicy","Not spicy enough"],
+    ["Bad roommate habit","Ideal roommate habit"],
+    ["Old-fashioned","Futuristic"],
+    ["Low-effort costume","Elaborate costume"],
+    ["Comfort food","Fancy food"],
+    ["Bad gift","Great gift"],
+    ["Quiet night in","Wild night out"],
+    ["Ordinary pet","Exotic pet"],
+    ["Guilty pleasure","Genuinely great"],
+    ["Awkward silence","Great conversation"],
+    ["Underdog","Favorite to win"],
+    ["Basic vacation","Bucket-list trip"],
+    ["Mild flex","Massive flex"],
+    ["Nostalgic","Cutting-edge"],
+    ["Easy mode","Nightmare difficulty"]
+  ];
+
+  /* ---------------- tiny utils ---------------- */
+  function $(id){ return document.getElementById(id); }
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+  function esc(s){ return (s==null) ? "" : String(s); } // used only with textContent, never innerHTML
+  function randomCode(len){
+    var s = "";
+    for(var i=0;i<len;i++) s += CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)];
+    return s;
+  }
+  function nameColor(name){
+    var h = 0;
+    for(var i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) >>> 0;
+    var hue = h % 360;
+    return "hsl(" + hue + ",68%,62%)";
+  }
+  function initials(name){
+    var t = (name||"?").trim();
+    if(!t) return "?";
+    var parts = t.split(/\s+/);
+    if(parts.length===1) return parts[0].slice(0,2).toUpperCase();
+    return (parts[0][0]+parts[1][0]).toUpperCase();
+  }
+  function sanitizeName(n){
+    n = (n||"").toString().trim().slice(0,18);
+    return n || "Player";
+  }
+  function sanitizeTopic(t){
+    t = (t||"").toString().trim().slice(0,40);
+    return t;
+  }
+  function scoreFor(target, guess){
+    var d = Math.abs(target - guess);
+    for(var i=0;i<ZONES.length;i++){ if(d <= ZONES[i].max) return ZONES[i].pts; }
+    return 0;
+  }
+
+  /* ---------------- shared runtime state ---------------- */
+  var peer = null;
+  var isHost = false;
+  var myId = null;
+  var myName = "Player";
+  var hostConn = null;            // joiner -> connection to host
+  var connections = {};           // host -> { peerId: DataConnection }
+  var roomCode = null;
+
+  // canonical game state (lives on host only; clients hold last-received view)
+  var state = {
+    players: {},          // id -> {id, name}
+    psychicId: null,
+    phase: "idle",         // idle | choosing | playing | revealed
+    topic: null,           // {a,b}
+    target: null,          // 0-100, host-only truth
+    sliderValue: 50,
+    locked: false,
+    draggingBy: null,
+    lastResult: null,
+    totalScore: 0,
+    history: []
+  };
+
+  /* ---------------- landing screen wiring ---------------- */
+  $("tab-host").addEventListener("click", function(){
+    $("tab-host").classList.add("active");
+    $("tab-join").classList.remove("active");
+    $("pane-host").classList.remove("hidden");
+    $("pane-join").classList.add("hidden");
+  });
+  $("tab-join").addEventListener("click", function(){
+    $("tab-join").classList.add("active");
+    $("tab-host").classList.remove("active");
+    $("pane-join").classList.remove("hidden");
+    $("pane-host").classList.add("hidden");
+  });
+
+  $("btn-create-room").addEventListener("click", function(){
+    var name = sanitizeName($("host-name").value);
+    myName = name;
+    setHostButtonBusy(true);
+    createRoom(name, 0);
+  });
+
+  function setHostButtonBusy(busy){
+    $("btn-create-room").disabled = busy;
+    $("btn-create-room").textContent = busy ? "Opening room…" : "Create room";
+  }
+
+  function createRoom(name, attempt){
+    if(attempt > 5){
+      $("host-error").textContent = "Couldn't open a room right now. Check your connection and try again.";
+      setHostButtonBusy(false);
+      return;
+    }
+    var code = randomCode(5);
+    var p = new Peer(ROOM_PREFIX + code);
+    var settled = false;
+
+    p.on("open", function(id){
+      settled = true;
+      peer = p; isHost = true; myId = id; roomCode = code;
+      state.players[myId] = {id: myId, name: name};
+      enterGameScreen();
+    });
+
+    p.on("error", function(err){
+      if(settled) { handlePeerError(err); return; }
+      if(err && err.type === "unavailable-id"){
+        p.destroy();
+        createRoom(name, attempt+1);
+      } else {
+        $("host-error").textContent = "Couldn't open a room (" + (err && err.type ? err.type : "connection error") + "). Trying again…";
+        p.destroy();
+        setTimeout(function(){ createRoom(name, attempt+1); }, 500);
+      }
+    });
+  }
+
+  $("btn-join-room").addEventListener("click", function(){
+    var name = sanitizeName($("join-name").value);
+    var code = ($("join-code").value || "").trim().toUpperCase();
+    $("join-error").textContent = "";
+    if(code.length < 4){
+      $("join-error").textContent = "Enter the room code your host shared with you.";
+      return;
+    }
+    myName = name;
+    $("btn-join-room").disabled = true;
+    $("btn-join-room").textContent = "Joining…";
+    joinRoom(name, code);
+  });
+
+  function joinRoom(name, code){
+    var p = new Peer();
+    p.on("open", function(id){
+      peer = p; isHost = false; myId = id; roomCode = code;
+      var conn = p.connect(ROOM_PREFIX + code, {reliable:true});
+      hostConn = conn;
+
+      var openTimeout = setTimeout(function(){
+        $("join-error").textContent = "No one answered that room code. Double-check it with your host.";
+        $("btn-join-room").disabled = false;
+        $("btn-join-room").textContent = "Join room";
+        conn.close();
+      }, 9000);
+
+      conn.on("open", function(){
+        clearTimeout(openTimeout);
+        conn.send(JSON.stringify({t:"join", name:name}));
+        enterGameScreen();
+      });
+      conn.on("data", onClientData);
+      conn.on("close", function(){ showConnLost("Lost the connection to the host."); });
+      conn.on("error", function(){ clearTimeout(openTimeout); });
+    });
+    p.on("error", function(err){
+      if(err && err.type === "peer-unavailable"){
+        $("join-error").textContent = "No room found with that code. Ask your host for the current one.";
+      } else {
+        $("join-error").textContent = "Connection problem (" + (err && err.type ? err.type : "unknown") + "). Try again.";
+      }
+      $("btn-join-room").disabled = false;
+      $("btn-join-room").textContent = "Join room";
+    });
+  }
+
+  function handlePeerError(err){
+    if(!err) return;
+    if(err.type === "disconnected"){
+      peer.reconnect();
+    } else if(err.type === "network" || err.type === "server-error"){
+      showConnLost("Signal service unreachable — check your internet connection.");
+    }
+  }
+
+  /* ---------------- host-side logic ---------------- */
+  function broadcastState(){
+    for(var pid in connections){
+      if(connections.hasOwnProperty(pid)){
+        connections[pid].send(JSON.stringify({t:"state", state: viewFor(pid)}));
+      }
+    }
+    renderApp(viewFor(myId));
+  }
+
+  function viewFor(peerId){
+    var revealTarget = (state.phase === "revealed") || (peerId === state.psychicId);
+    return {
+      youId: peerId,
+      players: state.players,
+      psychicId: state.psychicId,
+      phase: state.phase,
+      topic: state.topic,
+      target: revealTarget ? state.target : null,
+      sliderValue: state.sliderValue,
+      locked: state.locked,
+      draggingBy: state.draggingBy,
+      lastResult: state.lastResult,
+      totalScore: state.totalScore,
+      history: state.history,
+      youArePsychic: peerId === state.psychicId
+    };
+  }
+
+  function handleAction(fromId, action){
+    switch(action.t){
+      case "join":
+        state.players[fromId] = {id: fromId, name: sanitizeName(action.name)};
+        break;
+      case "claimPsychic":
+        state.psychicId = fromId;
+        state.phase = "choosing";
+        state.topic = null; state.target = null;
+        state.sliderValue = 50; state.locked = false;
+        state.draggingBy = null; state.lastResult = null;
+        break;
+      case "startRound":
+        if(fromId !== state.psychicId) return;
+        var a = sanitizeTopic(action.a), b = sanitizeTopic(action.b);
+        if(!a || !b) return;
+        state.topic = {a:a, b:b};
+        state.target = Math.random()*100;
+        state.phase = "playing";
+        state.sliderValue = 50; state.locked = false; state.draggingBy = null;
+        break;
+      case "dragStart":
+        if(fromId === state.psychicId || state.locked) return;
+        if(state.draggingBy && state.draggingBy !== fromId) return;
+        state.draggingBy = fromId;
+        break;
+      case "drag":
+        if(fromId === state.psychicId || state.locked) return;
+        if(state.draggingBy !== fromId) return;
+        state.sliderValue = clamp(Number(action.value)||0, 0, 100);
+        break;
+      case "dragEnd":
+        if(state.draggingBy === fromId) state.draggingBy = null;
+        break;
+      case "lock":
+        if(fromId === state.psychicId || state.phase !== "playing") return;
+        state.locked = true; state.draggingBy = null;
+        break;
+      case "unlock":
+        if(fromId === state.psychicId || state.phase !== "playing") return;
+        state.locked = false;
+        break;
+      case "reveal":
+        if(fromId !== state.psychicId || !state.locked || state.phase !== "playing") return;
+        var pts = scoreFor(state.target, state.sliderValue);
+        var result = {
+          points: pts, target: state.target, guess: state.sliderValue,
+          a: state.topic.a, b: state.topic.b,
+          psychicName: (state.players[state.psychicId]||{}).name || "Someone"
+        };
+        state.phase = "revealed";
+        state.lastResult = result;
+        state.totalScore += pts;
+        state.history.push(result);
+        break;
+      default: return;
+    }
+    broadcastState();
+  }
+
+  function hostOnConnection(conn){
+    connections[conn.peer] = conn;
+    conn.on("data", function(raw){
+      var msg; try{ msg = JSON.parse(raw); }catch(e){ return; }
+      handleAction(conn.peer, msg);
+    });
+    conn.on("close", function(){
+      delete connections[conn.peer];
+      delete state.players[conn.peer];
+      if(state.psychicId === conn.peer){
+        state.psychicId = null; state.phase = "idle"; state.topic=null; state.target=null; state.locked=false; state.draggingBy=null;
+      }
+      if(state.draggingBy === conn.peer) state.draggingBy = null;
+      broadcastState();
+    });
+  }
+
+  /* ---------------- client-side (non-host) ---------------- */
+  function onClientData(raw){
+    var msg; try{ msg = JSON.parse(raw); }catch(e){ return; }
+    if(msg.t === "state"){ renderApp(msg.state); }
+  }
+
+  function sendAction(action){
+    if(isHost){
+      handleAction(myId, action);
+    } else if(hostConn && hostConn.open){
+      hostConn.send(JSON.stringify(action));
+    }
+  }
+
+  /* ---------------- connection banner ---------------- */
+  function showConnLost(text){
+    $("conn-toast-text").textContent = text;
+    $("conn-toast").classList.remove("hidden");
+    $("conn-dot").classList.add("off");
+  }
+  function hideConnLost(){
+    $("conn-toast").classList.add("hidden");
+    $("conn-dot").classList.remove("off");
+  }
+  $("btn-reconnect").addEventListener("click", function(){
+    if(isHost) return;
+    $("btn-reconnect").disabled = true;
+    $("btn-reconnect").textContent = "Reconnecting…";
+    var conn = peer.connect(ROOM_PREFIX + roomCode, {reliable:true});
+    hostConn = conn;
+    conn.on("open", function(){
+      hideConnLost();
+      $("btn-reconnect").disabled = false;
+      $("btn-reconnect").textContent = "Reconnect";
+      conn.send(JSON.stringify({t:"join", name:myName}));
+    });
+    conn.on("data", onClientData);
+    conn.on("close", function(){ showConnLost("Lost the connection to the host."); });
+    conn.on("error", function(){
+      $("btn-reconnect").disabled = false;
+      $("btn-reconnect").textContent = "Reconnect";
+    });
+  });
+
+  /* ---------------- entering the game screen ---------------- */
+  function enterGameScreen(){
+    $("screen-landing").style.display = "none";
+    $("screen-game").style.display = "flex";
+    $("room-code-display").textContent = roomCode;
+
+    if(isHost){
+      peer.on("connection", hostOnConnection);
+      peer.on("disconnected", function(){ peer.reconnect(); });
+      peer.on("error", handlePeerError);
+      broadcastState();
+    }
+  }
+
+  $("btn-copy-code").addEventListener("click", function(){
+    if(!roomCode) return;
+    var txt = roomCode;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(flashCopied, flashCopied);
+    } else { flashCopied(); }
+  });
+  function flashCopied(){
+    var el = $("room-code-display");
+    var prev = el.textContent;
+    el.textContent = "Copied!";
+    setTimeout(function(){ el.textContent = prev; }, 900);
+  }
+
+  /* ================= RENDERING ================= */
+  var currentView = null;
+  // Fast-path refs: while a round is in progress, slider/drag updates arrive
+  // many times per second. Rebuilding the panel's innerHTML on every one of
+  // those would destroy and recreate the puck element mid-gesture, which
+  // silently breaks the active pointer-capture drag. So the panel is only
+  // fully rebuilt when something *structural* changes (phase, topic, who's
+  // psychic, locked state, reveal result); slider position and "who's
+  // holding it" text are patched in place via these refs instead.
+  var panelStructKey = null;
+  var puckRef = null;
+  var roleLineRef = null;
+
+  function renderApp(view){
+    currentView = view;
+    renderTopbar(view);
+    renderScorebar(view);
+    renderPanel(view);
+  }
+
+  function renderTopbar(view){
+    var chipsEl = $("player-chips");
+    chipsEl.innerHTML = "";
+    var ids = Object.keys(view.players || {});
+    ids.forEach(function(pid){
+      var pl = view.players[pid];
+      var chip = document.createElement("div");
+      chip.className = "chip" + (pid === view.psychicId ? " psy" : "");
+      chip.style.background = nameColor(pl.name);
+      chip.title = pl.name + (pid === view.psychicId ? " — reading the signal" : "") + (pid===view.youId ? " (you)" : "");
+      chip.textContent = initials(pl.name);
+      chipsEl.appendChild(chip);
+    });
+  }
+
+  function renderScorebar(view){
+    $("total-score").textContent = view.totalScore || 0;
+    var histEl = $("history-row");
+    histEl.innerHTML = "";
+    (view.history || []).slice(-12).forEach(function(r){
+      var pip = document.createElement("div");
+      pip.className = "hist-pip p" + r.points;
+      pip.textContent = r.points;
+      histEl.appendChild(pip);
+    });
+  }
+
+  function structKey(view){
+    return [
+      view.phase,
+      view.topic ? (view.topic.a + "|" + view.topic.b) : "",
+      view.psychicId,
+      view.locked ? "1" : "0",
+      view.youArePsychic ? "1" : "0",
+      view.lastResult ? (view.lastResult.target + "|" + view.lastResult.guess + "|" + view.lastResult.points) : ""
+    ].join("::");
+  }
+
+  function renderPanel(view){
+    var key = structKey(view);
+    if(view.phase === "playing" && key === panelStructKey && puckRef){
+      // fast path: same round, same structure — just patch positions
+      puckRef.style.left = clamp(view.sliderValue,0,100) + "%";
+      puckRef.setAttribute("aria-valuenow", String(Math.round(view.sliderValue)));
+      puckRef.classList.toggle("held", !!view.draggingBy);
+      if(roleLineRef) fillRoleLine(roleLineRef, view);
+      return;
+    }
+    panelStructKey = key;
+    puckRef = null;
+    roleLineRef = null;
+
+    var panel = $("main-panel");
+    panel.innerHTML = "";
+
+    if(view.phase === "idle"){ panel.appendChild(buildIdlePane(view)); return; }
+    if(view.phase === "choosing"){ panel.appendChild(buildChoosingPane(view)); return; }
+    if(view.phase === "playing"){ panel.appendChild(buildPlayingPane(view)); return; }
+    if(view.phase === "revealed"){ panel.appendChild(buildRevealedPane(view)); return; }
+  }
+
+  function el(tag, cls, text){
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(text != null) e.textContent = text;
+    return e;
+  }
+
+  function claimButton(label){
+    var b = el("button", "btn btn-primary btn-block", label);
+    b.type = "button";
+    b.addEventListener("click", function(){ sendAction({t:"claimPsychic"}); });
+    return b;
+  }
+
+  function buildIdlePane(view){
+    var wrap = el("div","state-msg");
+    wrap.appendChild(el("div","big-emoji","📡"));
+    wrap.appendChild(el("h2",null,"Nobody's reading the signal yet"));
+    wrap.appendChild(el("p",null,"One of you needs to pick a topic and hold the hidden target. Everyone else guesses where it sits."));
+    wrap.appendChild(claimButton("🔮 I'll give the clue"));
+    return wrap;
+  }
+
+  function buildChoosingPane(view){
+    if(view.youArePsychic){
+      var wrap = el("div","topic-picker");
+      wrap.appendChild(el("div","eyebrow","YOU'RE READING THE SIGNAL — pick a topic"));
+
+      var row = el("div","row");
+      var inA = document.createElement("input");
+      inA.placeholder = "Point A (e.g. Bad idea)";
+      inA.maxLength = 40;
+      inA.id = "topic-a-input";
+      var inB = document.createElement("input");
+      inB.placeholder = "Point B (e.g. Great idea)";
+      inB.maxLength = 40;
+      inB.id = "topic-b-input";
+      row.appendChild(inA);
+      row.appendChild(inB);
+      wrap.appendChild(row);
+
+      var randRow = el("div","row");
+      var randBtn = el("button","btn btn-ghost btn-sm","🎲 Random topic");
+      randBtn.type = "button";
+      randBtn.addEventListener("click", function(){
+        var pick = TOPICS[Math.floor(Math.random()*TOPICS.length)];
+        inA.value = pick[0]; inB.value = pick[1];
+      });
+      randRow.appendChild(randBtn);
+      wrap.appendChild(randRow);
+
+      var startBtn = el("button","btn btn-primary btn-block","Start round");
+      startBtn.type = "button";
+      startBtn.addEventListener("click", function(){
+        var a = inA.value.trim(), b = inB.value.trim();
+        if(!a || !b){
+          var pick = TOPICS[Math.floor(Math.random()*TOPICS.length)];
+          a = a || pick[0]; b = b || pick[1];
+        }
+        sendAction({t:"startRound", a:a, b:b});
+      });
+      wrap.appendChild(startBtn);
+      return wrap;
+    } else {
+      var msg = el("div","state-msg");
+      msg.appendChild(el("div","big-emoji","🎴"));
+      var psyName = (view.players[view.psychicId]||{}).name || "Someone";
+      msg.appendChild(el("h2",null, psyName + " is picking a topic…"));
+      msg.appendChild(el("p",null,"Hang tight — the round starts as soon as they lock in a spectrum."));
+      return msg;
+    }
+  }
+
+  function buildTrack(view, opts){
+    // opts: {showTarget:bool, draggable:bool, locked:bool}
+    var wrap = el("div","track-wrap");
+    var track = el("div","track" + (opts.locked ? " disabled" : ""));
+
+    if(opts.showTarget && view.target != null){
+      var mark = el("div","target-mark");
+      mark.style.left = view.target + "%";
+      track.appendChild(mark);
+    }
+
+    var puck = el("div","puck" + (view.draggingBy ? " held" : "") + (opts.locked ? " locked" : ""));
+    puck.style.left = clamp(view.sliderValue,0,100) + "%";
+    puck.setAttribute("role","slider");
+    puck.setAttribute("aria-valuemin","0");
+    puck.setAttribute("aria-valuemax","100");
+    puck.setAttribute("aria-valuenow", String(Math.round(view.sliderValue)));
+    puck.setAttribute("tabindex", opts.draggable ? "0" : "-1");
+    track.appendChild(puck);
+
+    wrap.appendChild(track);
+    puckRef = puck; // let the fast-path renderer patch this element directly
+
+    if(opts.draggable){
+      bindDrag(track, puck);
+    }
+    return wrap;
+  }
+
+  function bindDrag(track, puck){
+    var dragging = false;
+    var lastSendTs = 0;
+    var SEND_INTERVAL = 30; // ms — throttles network chatter, not the local puck
+    function pctFromEvent(evt){
+      var rect = track.getBoundingClientRect();
+      var x = clamp(evt.clientX - rect.left, 0, rect.width);
+      return rect.width ? (x / rect.width) * 100 : 50;
+    }
+    function moveLocalPuck(pct){
+      puck.style.left = pct + "%";
+      puck.setAttribute("aria-valuenow", String(Math.round(pct)));
+    }
+    function onDown(evt){
+      if(currentView && currentView.locked) return;
+      if(currentView && currentView.draggingBy && currentView.draggingBy !== currentView.youId) return;
+      dragging = true;
+      track.setPointerCapture && track.setPointerCapture(evt.pointerId);
+      var pct = pctFromEvent(evt);
+      moveLocalPuck(pct);
+      lastSendTs = Date.now();
+      sendAction({t:"dragStart"});
+      sendAction({t:"drag", value: pct});
+      evt.preventDefault();
+    }
+    function onMove(evt){
+      if(!dragging) return;
+      var pct = pctFromEvent(evt);
+      moveLocalPuck(pct); // instant, zero-latency local feedback
+      var now = Date.now();
+      if(now - lastSendTs >= SEND_INTERVAL){
+        lastSendTs = now;
+        sendAction({t:"drag", value: pct});
+      }
+      evt.preventDefault();
+    }
+    function onUp(evt){
+      if(!dragging) return;
+      dragging = false;
+      sendAction({t:"drag", value: pctFromEvent(evt)}); // final exact position, unthrottled
+      sendAction({t:"dragEnd"});
+    }
+    track.addEventListener("pointerdown", onDown);
+    track.addEventListener("pointermove", onMove);
+    track.addEventListener("pointerup", onUp);
+    track.addEventListener("pointercancel", onUp);
+    // keyboard support
+    puck.addEventListener("keydown", function(evt){
+      if(currentView && currentView.locked) return;
+      var step = evt.shiftKey ? 10 : 2;
+      var cur = currentView ? currentView.sliderValue : 50;
+      if(evt.key === "ArrowLeft"){ var v1=clamp(cur-step,0,100); moveLocalPuck(v1); sendAction({t:"dragStart"}); sendAction({t:"drag", value:v1}); sendAction({t:"dragEnd"}); evt.preventDefault(); }
+      if(evt.key === "ArrowRight"){ var v2=clamp(cur+step,0,100); moveLocalPuck(v2); sendAction({t:"dragStart"}); sendAction({t:"drag", value:v2}); sendAction({t:"dragEnd"}); evt.preventDefault(); }
+    });
+  }
+
+  function fillRoleLine(roleLine, view){
+    roleLine.innerHTML = "";
+    var psyName = (view.players[view.psychicId]||{}).name || "Someone";
+    if(view.youArePsychic){
+      roleLine.appendChild(el("span",null,"👀 Only you can see the target. Give your clue out loud — don't touch the marker."));
+    } else if(view.draggingBy){
+      var dName = (view.players[view.draggingBy]||{}).name || "Someone";
+      roleLine.appendChild(el("span",null, (view.draggingBy===view.youId ? "You're" : dName + " is") + " holding the marker"));
+    } else {
+      roleLine.appendChild(el("span",null,"🔮 "));
+      roleLine.appendChild(el("b",null,psyName));
+      roleLine.appendChild(el("span",null," is giving the clue — drag together to place your guess."));
+    }
+  }
+
+  function buildPlayingPane(view){
+    var wrap = el("div","state-msg");
+    wrap.style.gap = "18px";
+    wrap.style.justifyContent = "flex-start";
+    wrap.style.textAlign = "left";
+    wrap.style.alignItems = "stretch";
+
+    var topicRow = el("div","topic-row");
+    topicRow.appendChild(el("div","topic-label a", view.topic ? view.topic.a : "Point A"));
+    topicRow.appendChild(el("div","topic-label b", view.topic ? view.topic.b : "Point B"));
+    wrap.appendChild(topicRow);
+
+    var draggable = !view.youArePsychic && !view.locked;
+    wrap.appendChild(buildTrack(view, {showTarget: view.youArePsychic, draggable: draggable, locked: view.locked}));
+
+    var roleLine = el("div","role-line");
+    fillRoleLine(roleLine, view);
+    wrap.appendChild(roleLine);
+    roleLineRef = roleLine; // let the fast-path renderer patch this in place
+
+    var controls = el("div","controls");
+    if(!view.youArePsychic){
+      if(!view.locked){
+        var lockBtn = el("button","btn btn-teal","Lock in guess");
+        lockBtn.type="button";
+        lockBtn.addEventListener("click", function(){ sendAction({t:"lock"}); });
+        controls.appendChild(lockBtn);
+      } else {
+        var unlockBtn = el("button","btn btn-ghost","Unlock & adjust");
+        unlockBtn.type="button";
+        unlockBtn.addEventListener("click", function(){ sendAction({t:"unlock"}); });
+        controls.appendChild(unlockBtn);
+      }
+    } else {
+      var revealBtn = el("button","btn btn-primary", view.locked ? "🎯 Reveal target" : "Waiting for the group to lock in…");
+      revealBtn.type="button";
+      revealBtn.disabled = !view.locked;
+      revealBtn.addEventListener("click", function(){ sendAction({t:"reveal"}); });
+      controls.appendChild(revealBtn);
+    }
+    wrap.appendChild(controls);
+
+    return wrap;
+  }
+
+  function buildRevealedPane(view){
+    var wrap = el("div","state-msg");
+    wrap.style.gap = "16px";
+
+    var r = view.lastResult;
+    var box = el("div","reveal-box");
+    var badge = el("div","points-badge" + (r && r.points===0 ? " zero" : ""), r ? ("+" + r.points) : "+0");
+    box.appendChild(badge);
+    box.appendChild(el("div","reveal-sub", r ? (r.points===4 ? "Dead on the signal." : r.points===0 ? "Off the wavelength." : "Close enough to feel it.") : ""));
+    wrap.appendChild(box);
+
+    var topicRow = el("div","topic-row");
+    topicRow.appendChild(el("div","topic-label a", r ? r.a : ""));
+    topicRow.appendChild(el("div","topic-label b", r ? r.b : ""));
+    wrap.appendChild(topicRow);
+
+    var trackWrap = el("div","track-wrap");
+    var track = el("div","track");
+    if(r){
+      var star = el("div","target-star");
+      star.style.left = r.target + "%";
+      track.appendChild(star);
+      var puck = el("div","puck locked");
+      puck.style.left = r.guess + "%";
+      track.appendChild(puck);
+    }
+    trackWrap.appendChild(track);
+    wrap.appendChild(trackWrap);
+
+    var controls = el("div","controls");
+    controls.appendChild(claimButton("🔮 I'll go next"));
+    wrap.appendChild(controls);
+
+    return wrap;
+  }
+
+})();
+</script>
+</body>
+</html>
