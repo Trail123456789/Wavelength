@@ -108,6 +108,17 @@
   .btn-sm{padding:10px 16px; font-size:13.5px;}
   .btn-block{width:100%;}
 
+  /* Host controls */
+  .host-controls {
+    margin-top: 10px; padding-top: 12px; border-top: 1px dashed var(--line);
+    display: flex; justify-content: center; width: 100%;
+  }
+  .btn-host {
+    background: transparent; color: var(--text-faint); border: 1px solid var(--line);
+    font-size: 12px; padding: 6px 14px; border-radius: 999px;
+  }
+  .btn-host:hover { color: var(--danger); border-color: var(--danger); }
+
   /* ---------- landing ---------- */
   #screen-landing{
     flex:1;
@@ -121,17 +132,9 @@
   .hero .wordmark{font-size:clamp(30px,7vw,42px); line-height:1;}
   .hero .wordmark span{color:var(--amber);}
   .hero p{color:var(--text-muted); font-size:14.5px; max-width:340px; margin:0;}
-  .signal{
-    width:100%;
-    max-width:320px;
-    height:64px;
-    position:relative;
-  }
+  .signal{ width:100%; max-width:320px; height:64px; position:relative; }
   .signal svg{width:100%;height:100%;display:block;}
-  .signal .ping{
-    transform-origin:center;
-    animation:ping 2.6s ease-out infinite;
-  }
+  .signal .ping{ transform-origin:center; animation:ping 2.6s ease-out infinite; }
   .signal .ping.d2{animation-delay:.65s;}
   .signal .ping.d3{animation-delay:1.3s;}
   @keyframes ping{
@@ -139,16 +142,10 @@
     75%{opacity:0;}
     100%{opacity:0; transform:scaleX(1);}
   }
-  @media (prefers-reduced-motion: reduce){
-    .signal .ping{animation:none; opacity:.25;}
-  }
 
   .card{
-    background:var(--panel);
-    border:1px solid var(--line);
-    border-radius:var(--radius-lg);
-    padding:22px;
-    box-shadow:var(--shadow-card);
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-lg);
+    padding:22px; box-shadow:var(--shadow-card);
   }
   .landing-actions{display:flex; flex-direction:column; gap:12px;}
   .landing-tabs{display:flex; gap:8px; background:var(--track-groove); padding:4px; border-radius:999px; margin-bottom:18px;}
@@ -170,7 +167,7 @@
   }
   .room-pill{display:flex; align-items:center; gap:9px;}
   .room-pill .dot{width:8px;height:8px;border-radius:50%; background:var(--teal); box-shadow:0 0 8px var(--teal);}
-  .room-pill .dot.off{background:var(--danger); box-shadow:none;}
+  .room-pill .dot.off{background:var(--danger); box-shadow:0 0 8px var(--danger);}
   .room-code{font-family:var(--font-mono); font-size:15px; letter-spacing:0.1em; font-weight:700;}
   .room-code-btn{background:none; color:var(--text); display:flex; align-items:center; gap:8px; padding:4px;}
   .players{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
@@ -178,24 +175,23 @@
     width:30px; height:30px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
     font-family:var(--font-mono); font-size:12px; font-weight:700; color:#0a0f12;
-    border:2px solid var(--panel);
+    border:2px solid var(--panel); transition: opacity 0.2s;
   }
   .chip.psy{box-shadow:0 0 0 2px var(--amber);}
+  .chip.offline{opacity: 0.35; filter: grayscale(1);}
   .toast{
     font-size:13px; color:var(--danger); background:rgba(224,133,133,0.1);
     border:1px solid rgba(224,133,133,0.3); border-radius:var(--radius-sm);
-    padding:9px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:11px 16px; display:flex; align-items:center; justify-content:center; gap:10px;
+    font-weight: 600; text-align: center;
   }
-  .toast button{background:var(--danger); color:#2a0e0e; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700;}
 
   .scorebar{
     display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:center;
     background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-md);
     padding:11px 16px; min-height: 48px;
   }
-  .player-score{
-    font-family:var(--font-mono); font-size:14px; font-weight:700;
-  }
+  .player-score{font-family:var(--font-mono); font-size:14px; font-weight:700;}
 
   /* ---------- main panel ---------- */
   .panel{
@@ -220,22 +216,16 @@
   .topic-label.b{text-align:right; color:var(--amber);}
 
   .track-wrap{position:relative; padding:22px 4px 6px;}
-  .track{
-    position:relative; height:16px; border-radius:999px;
-    background:var(--track-groove);
-    border:1px solid var(--line);
-    touch-action:none;
-    overflow:hidden;
+  .track{ position:relative; height:16px; touch-action:none; }
+  .track-inner {
+    position: absolute; inset: 0; background: var(--track-groove);
+    border: 1px solid var(--line); border-radius: 999px; overflow: hidden;
   }
-  .track.disabled{opacity:0.55;}
-  .zone{position:absolute; top:0; bottom:0; border-radius:2px;}
+  .track.disabled .track-inner{opacity:0.55;}
   
-  /* The scoring bands */
   .target-band {
-    position: absolute;
-    top: 0; bottom: 0;
-    transform: translateX(-50%);
-    border-radius: 2px;
+    position: absolute; top: 0; bottom: 0;
+    transform: translateX(-50%); border-radius: 2px;
   }
   .band-4 { background: var(--amber); box-shadow: 0 0 10px rgba(255,180,84,0.7); z-index: 3; }
   .band-3 { background: rgba(255, 180, 84, 0.55); z-index: 2; }
@@ -255,10 +245,6 @@
   .target-star{
     position:absolute; top:50%; width:14px; height:14px; transform:translate(-50%,-50%) rotate(45deg);
     background: #fff; box-shadow:0 0 12px var(--amber); z-index:5; border-radius:3px;
-  }
-  .drag-hint{
-    position:absolute; left:50%; top:-2px; transform:translate(-50%,-100%);
-    font-family:var(--font-mono); font-size:11px; color:var(--text-faint); white-space:nowrap;
   }
 
   .role-line{display:flex; align-items:center; gap:10px; justify-content:center; text-align:center;}
@@ -290,13 +276,9 @@
     padding: 6px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 600;
     display: flex; align-items: center; gap: 8px; color: var(--text);
   }
-  .breakdown-pill .dot {
-    width: 10px; height: 10px; border-radius: 50%;
-  }
+  .breakdown-pill .dot { width: 10px; height: 10px; border-radius: 50%; }
 
-  footer.hint{
-    text-align:center; color:var(--text-faint); font-size:12px; padding:6px 0 2px;
-  }
+  footer.hint{ text-align:center; color:var(--text-faint); font-size:12px; padding:6px 0 2px; }
 
   @media (max-width:380px){
     .controls .btn{min-width:100%;}
@@ -366,8 +348,7 @@
     </div>
 
     <div id="conn-toast" class="toast hidden">
-      <span id="conn-toast-text">Connection lost.</span>
-      <button id="btn-reconnect" type="button">Reconnect</button>
+      <span id="conn-toast-text">Connection lost. Reconnecting automatically...</span>
     </div>
 
     <div class="scorebar" id="scorebar">
@@ -387,12 +368,23 @@
 (function(){
   "use strict";
 
-  /* ---------------- config ---------------- */
+  /* ---------------- config & reliability ---------------- */
   var ROOM_PREFIX = "wvlen-sync-";
-  var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
+  var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; 
   
-  // Expanded scoring zones mapping perfectly to the physical dial
-  // Widths on the track will be double the max radius (e.g. 7% wide target for 4 pts)
+  // Expanded connection reliability by mapping onto high-availability public ICE/STUN servers
+  var PEER_OPTS = {
+    config: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" }
+      ]
+    }
+  };
+
+  // Target Zones mapping nicely to physical Wavelength point spreads
   var ZONES = [ {max:3.5, pts:4}, {max:8.5, pts:3}, {max:15, pts:2} ];
 
   var TOPICS = [
@@ -468,10 +460,13 @@
   var hostConn = null;            
   var connections = {};           
   var roomCode = null;
+  var lastMsgTime = Date.now();
+  var autoReconnectTimer = null;
 
   // canonical game state (lives on host only)
   var state = {
-    players: {},          
+    hostId: null,
+    players: {},          // id -> {id, name, online}
     playerOrder: [],      // tracks active players for circulating rounds seamlessly
     psychicId: null,
     phase: "idle",        // idle | choosing | playing | revealed
@@ -517,13 +512,14 @@
       return;
     }
     var code = randomCode(5);
-    var p = new Peer(ROOM_PREFIX + code);
+    var p = new Peer(ROOM_PREFIX + code, PEER_OPTS);
     var settled = false;
 
     p.on("open", function(id){
       settled = true;
       peer = p; isHost = true; myId = id; roomCode = code;
-      state.players[myId] = {id: myId, name: name};
+      state.hostId = id;
+      state.players[myId] = {id: myId, name: name, online: true};
       state.playerOrder = [myId];
       state.scores = {};
       state.scores[myId] = 0;
@@ -536,7 +532,7 @@
         p.destroy();
         createRoom(name, attempt+1);
       } else {
-        $("host-error").textContent = "Couldn't open a room (" + (err && err.type ? err.type : "connection error") + "). Trying again…";
+        $("host-error").textContent = "Couldn't open a room. Trying again…";
         p.destroy();
         setTimeout(function(){ createRoom(name, attempt+1); }, 500);
       }
@@ -558,7 +554,7 @@
   });
 
   function joinRoom(name, code){
-    var p = new Peer();
+    var p = new Peer(PEER_OPTS);
     p.on("open", function(id){
       peer = p; isHost = false; myId = id; roomCode = code;
       var conn = p.connect(ROOM_PREFIX + code, {reliable:true});
@@ -574,11 +570,12 @@
       conn.on("open", function(){
         clearTimeout(openTimeout);
         conn.send(JSON.stringify({t:"join", name:name}));
+        lastMsgTime = Date.now();
         enterGameScreen();
       });
       conn.on("data", onClientData);
-      conn.on("close", function(){ showConnLost("Lost the connection to the host."); });
-      conn.on("error", function(){ clearTimeout(openTimeout); });
+      conn.on("close", scheduleReconnect);
+      conn.on("error", function(){ clearTimeout(openTimeout); scheduleReconnect(); });
     });
     p.on("error", function(err){
       if(err && err.type === "peer-unavailable"){
@@ -594,16 +591,14 @@
   function handlePeerError(err){
     if(!err) return;
     if(err.type === "disconnected"){
-      peer.reconnect();
-    } else if(err.type === "network" || err.type === "server-error"){
-      showConnLost("Signal service unreachable — check your internet connection.");
-    }
+      setTimeout(function() { if (peer && !peer.destroyed) peer.reconnect(); }, 1000);
+    } 
   }
 
   /* ---------------- host-side logic ---------------- */
   function broadcastState(){
     for(var pid in connections){
-      if(connections.hasOwnProperty(pid)){
+      if(connections.hasOwnProperty(pid) && connections[pid].open){
         connections[pid].send(JSON.stringify({t:"state", state: viewFor(pid)}));
       }
     }
@@ -628,6 +623,7 @@
     
     return {
       youId: peerId,
+      isRoomHost: peerId === state.hostId,
       players: state.players,
       playerOrder: state.playerOrder,
       psychicId: state.psychicId,
@@ -649,7 +645,7 @@
     var guessersCount = 0;
     
     state.playerOrder.forEach(function(pid) {
-      if (pid !== state.psychicId) {
+      if (pid !== state.psychicId && state.players[pid] && state.players[pid].online) {
         guessersCount++;
         if (!state.locks[pid]) allLocked = false;
       }
@@ -659,7 +655,8 @@
       var results = {};
       state.playerOrder.forEach(function(pid) {
         if (pid !== state.psychicId) {
-          var g = state.guesses[pid] || 50;
+          var g = state.guesses[pid];
+          if (g === undefined) g = 50; 
           var pts = scoreFor(state.target, g);
           state.scores[pid] = (state.scores[pid] || 0) + pts;
           results[pid] = { guess: g, points: pts };
@@ -677,13 +674,40 @@
     }
   }
 
+  function advancePsychic() {
+    var currentIdx = state.playerOrder.indexOf(state.psychicId);
+    var nextIdx = (currentIdx + 1) % state.playerOrder.length;
+    var loopCount = 0;
+    // Skip players who are offline
+    while (!state.players[state.playerOrder[nextIdx]].online && loopCount < state.playerOrder.length) {
+        nextIdx = (nextIdx + 1) % state.playerOrder.length;
+        loopCount++;
+    }
+    state.psychicId = state.playerOrder[nextIdx];
+    state.phase = "choosing";
+    state.topic = null; state.target = null;
+    state.guesses = {}; state.locks = {};
+  }
+
   function handleAction(fromId, action){
     switch(action.t){
       case "join":
-        state.players[fromId] = {id: fromId, name: sanitizeName(action.name)};
+        var incomingName = sanitizeName(action.name);
+        var existingId = null;
+        for (var pid in state.players) {
+          if (state.players[pid].name === incomingName && !state.players[pid].online) {
+             existingId = pid; break;
+          }
+        }
+        if (existingId && existingId !== fromId) {
+          state.scores[fromId] = state.scores[existingId] || 0;
+        } else if (!existingId && state.scores[fromId] === undefined) {
+          state.scores[fromId] = 0;
+        }
+
+        state.players[fromId] = {id: fromId, name: incomingName, online: true};
         if (!state.playerOrder.includes(fromId)) {
           state.playerOrder.push(fromId);
-          state.scores[fromId] = 0;
           if (state.phase === "playing") {
             state.guesses[fromId] = 50;
             state.locks[fromId] = false;
@@ -721,24 +745,23 @@
       case "lock":
         if(fromId === state.psychicId || state.phase !== "playing") return;
         state.locks[fromId] = true;
-        checkAutoReveal();
+        checkAutoReveal(false);
         break;
       case "unlock":
         if(fromId === state.psychicId || state.phase !== "playing") return;
         state.locks[fromId] = false;
         break;
+      case "skipTurn":
+        if (fromId !== state.hostId) return;
+        advancePsychic();
+        break;
       case "forceReveal":
-        if (fromId !== state.psychicId || state.phase !== "playing") return;
+        if (fromId !== state.hostId || state.phase !== "playing") return;
         checkAutoReveal(true);
         break;
       case "nextRound":
         if (state.phase !== "revealed") return;
-        var currentIdx = state.playerOrder.indexOf(state.psychicId);
-        var nextIdx = (currentIdx + 1) % state.playerOrder.length;
-        state.psychicId = state.playerOrder[nextIdx];
-        state.phase = "choosing";
-        state.topic = null; state.target = null;
-        state.guesses = {}; state.locks = {};
+        advancePsychic();
         break;
       default: return;
     }
@@ -749,30 +772,22 @@
     connections[conn.peer] = conn;
     conn.on("data", function(raw){
       var msg; try{ msg = JSON.parse(raw); }catch(e){ return; }
-      handleAction(conn.peer, msg);
+      if (msg.t !== "pong") handleAction(conn.peer, msg);
     });
     conn.on("close", function(){
       delete connections[conn.peer];
-      delete state.players[conn.peer];
-      state.playerOrder = state.playerOrder.filter(function(id) { return id !== conn.peer; });
       
-      if(state.psychicId === conn.peer){
-        if (state.playerOrder.length > 0) {
-          state.psychicId = state.playerOrder[0];
-          state.phase = "choosing";
-        } else {
-          state.psychicId = null; 
-          state.phase = "idle";
-        }
-      } else {
-        checkAutoReveal(); // Failsafe Auto-Reveal if wait loop breaks
+      if (state.players[conn.peer]) {
+          state.players[conn.peer].online = false;
       }
+      checkAutoReveal(false); 
       broadcastState();
     });
   }
 
   /* ---------------- client-side (non-host) ---------------- */
   function onClientData(raw){
+    lastMsgTime = Date.now();
     var msg; try{ msg = JSON.parse(raw); }catch(e){ return; }
     if(msg.t === "state"){ renderApp(msg.state); }
   }
@@ -785,7 +800,7 @@
     }
   }
 
-  /* ---------------- connection banner ---------------- */
+  /* ---------------- Robust Connection Banner & Auto Reconnect ---------------- */
   function showConnLost(text){
     $("conn-toast-text").textContent = text;
     $("conn-toast").classList.remove("hidden");
@@ -795,25 +810,42 @@
     $("conn-toast").classList.add("hidden");
     $("conn-dot").classList.remove("off");
   }
-  $("btn-reconnect").addEventListener("click", function(){
-    if(isHost) return;
-    $("btn-reconnect").disabled = true;
-    $("btn-reconnect").textContent = "Reconnecting…";
-    var conn = peer.connect(ROOM_PREFIX + roomCode, {reliable:true});
-    hostConn = conn;
-    conn.on("open", function(){
-      hideConnLost();
-      $("btn-reconnect").disabled = false;
-      $("btn-reconnect").textContent = "Reconnect";
-      conn.send(JSON.stringify({t:"join", name:myName}));
-    });
-    conn.on("data", onClientData);
-    conn.on("close", function(){ showConnLost("Lost the connection to the host."); });
-    conn.on("error", function(){
-      $("btn-reconnect").disabled = false;
-      $("btn-reconnect").textContent = "Reconnect";
-    });
-  });
+
+  function scheduleReconnect(){
+    if (isHost) return;
+    clearTimeout(autoReconnectTimer);
+    showConnLost("Connection lost. Reconnecting automatically...");
+    
+    autoReconnectTimer = setTimeout(function(){
+      if (!peer || peer.destroyed) return;
+      var conn = peer.connect(ROOM_PREFIX + roomCode, {reliable:true});
+      hostConn = conn;
+      conn.on("open", function(){
+        hideConnLost();
+        conn.send(JSON.stringify({t:"join", name:myName}));
+        lastMsgTime = Date.now();
+      });
+      conn.on("data", onClientData);
+      conn.on("close", scheduleReconnect);
+      conn.on("error", scheduleReconnect);
+    }, 3000);
+  }
+
+  /* Connection Keepalive Heartbeat */
+  setInterval(function(){
+    if (isHost) {
+      // Host pings everyone to keep NAT tables alive and verify connectivity
+      var pmsg = JSON.stringify({t:"ping"});
+      for (var pid in connections) {
+        if (connections[pid].open) connections[pid].send(pmsg);
+      }
+    } else if (hostConn && hostConn.open) {
+      // If client hears nothing from host for 6 seconds, assume dead and trigger auto-reconnect
+      if (Date.now() - lastMsgTime > 6000) {
+        hostConn.close(); 
+      }
+    }
+  }, 2000);
 
   /* ---------------- entering the game screen ---------------- */
   function enterGameScreen(){
@@ -823,9 +855,15 @@
 
     if(isHost){
       peer.on("connection", hostOnConnection);
-      peer.on("disconnected", function(){ peer.reconnect(); });
+      peer.on("disconnected", function(){ 
+        setTimeout(function() { if (peer && !peer.destroyed) peer.reconnect(); }, 1000);
+      });
       peer.on("error", handlePeerError);
       broadcastState();
+    } else {
+      peer.on("disconnected", function(){ 
+        setTimeout(function() { if (peer && !peer.destroyed) peer.reconnect(); }, 1000);
+      });
     }
   }
 
@@ -845,7 +883,6 @@
 
   /* ================= RENDERING ================= */
   var currentView = null;
-  // Fast-path rendering
   var panelStructKey = null;
   var puckRefs = {};
   var roleLineRef = null;
@@ -860,13 +897,13 @@
   function renderTopbar(view){
     var chipsEl = $("player-chips");
     chipsEl.innerHTML = "";
-    var ids = Object.keys(view.players || {});
-    ids.forEach(function(pid){
+    view.playerOrder.forEach(function(pid){
       var pl = view.players[pid];
+      if(!pl) return;
       var chip = document.createElement("div");
-      chip.className = "chip" + (pid === view.psychicId ? " psy" : "");
+      chip.className = "chip" + (pid === view.psychicId ? " psy" : "") + (!pl.online ? " offline" : "");
       chip.style.background = nameColor(pl.name);
-      chip.title = pl.name + (pid === view.psychicId ? " — reading the signal" : "") + (pid===view.youId ? " (you)" : "");
+      chip.title = pl.name + (!pl.online ? " (Disconnected)" : pid === view.psychicId ? " — reading the signal" : "") + (pid===view.youId ? " (you)" : "");
       chip.textContent = initials(pl.name);
       chipsEl.appendChild(chip);
     });
@@ -883,6 +920,7 @@
       
       var div = el("div", "player-score");
       div.style.color = nameColor(pl.name);
+      if(!pl.online) div.style.opacity = 0.5;
       
       var pts = view.scores[pid] || 0;
       div.textContent = pl.name + ": " + pts + " pts";
@@ -998,36 +1036,45 @@
       var psyName = (view.players[view.psychicId]||{}).name || "Someone";
       msg.appendChild(el("h2",null, psyName + " is picking a topic…"));
       msg.appendChild(el("p",null,"Hang tight — the round starts as soon as they lock in a spectrum."));
+      
+      // AFK Skip Button specifically for the Host
+      if (view.isRoomHost) {
+        var hostCtrl = el("div", "host-controls");
+        var skipBtn = el("button", "btn-host", "Host: Skip their turn (AFK)");
+        skipBtn.addEventListener("click", function(){ sendAction({t:"skipTurn"}); });
+        hostCtrl.appendChild(skipBtn);
+        msg.appendChild(hostCtrl);
+      }
+
       return msg;
     }
   }
 
-  function appendTargetBands(track, targetVal) {
-    // 2-point band
+  function appendTargetBands(container, targetVal) {
     var b2 = el("div", "target-band band-2");
     b2.style.left = targetVal + "%"; 
     b2.style.width = (ZONES[2].max * 2) + "%";
-    track.appendChild(b2);
+    container.appendChild(b2);
 
-    // 3-point band
     var b3 = el("div", "target-band band-3");
     b3.style.left = targetVal + "%"; 
     b3.style.width = (ZONES[1].max * 2) + "%";
-    track.appendChild(b3);
+    container.appendChild(b3);
 
-    // 4-point band
     var b4 = el("div", "target-band band-4");
     b4.style.left = targetVal + "%"; 
     b4.style.width = (ZONES[0].max * 2) + "%";
-    track.appendChild(b4);
+    container.appendChild(b4);
   }
 
   function buildTrack(view, opts){
     var wrap = el("div","track-wrap");
     var track = el("div","track" + (opts.locked ? " disabled" : ""));
+    var trackInner = el("div", "track-inner"); // strictly clips the bands, allows markers to exist outside
+    track.appendChild(trackInner);
 
     if(opts.showTarget && view.target != null){
-      appendTargetBands(track, view.target);
+      appendTargetBands(trackInner, view.target);
       var mark = el("div","target-star");
       mark.style.left = view.target + "%";
       track.appendChild(mark);
@@ -1169,7 +1216,7 @@
       var lockedCount = 0;
       var totalGuessers = 0;
       view.playerOrder.forEach(function(pid){
-        if(pid !== view.psychicId){
+        if(pid !== view.psychicId && view.players[pid].online){
           totalGuessers++;
           if(view.locks[pid]) lockedCount++;
         }
@@ -1187,6 +1234,15 @@
       }
     }
     wrap.appendChild(controls);
+
+    // Host Force Reveal Button
+    if (view.isRoomHost) {
+      var hostCtrl = el("div", "host-controls");
+      var fRevBtn = el("button", "btn-host", "Host: Force Reveal");
+      fRevBtn.addEventListener("click", function(){ sendAction({t:"forceReveal"}); });
+      hostCtrl.appendChild(fRevBtn);
+      wrap.appendChild(hostCtrl);
+    }
 
     return wrap;
   }
@@ -1221,15 +1277,38 @@
 
     var trackWrap = el("div","track-wrap");
     var track = el("div","track");
+    var trackInner = el("div","track-inner");
+    track.appendChild(trackInner);
+
     if(r){
-      appendTargetBands(track, r.target);
+      appendTargetBands(trackInner, r.target);
       var star = el("div","target-star");
       star.style.left = r.target + "%";
       track.appendChild(star);
       
+      // Calculate staggering offsets for overlapping pucks so none are hidden
+      var placedPucks = [];
       for (var pid in r.results) {
+        var guess = r.results[pid].guess;
+        
+        // See if someone else is already at almost this exact spot
+        var closeCount = 0;
+        for (var i=0; i < placedPucks.length; i++) {
+           if (Math.abs(placedPucks[i] - guess) <= 3) closeCount++; 
+        }
+        placedPucks.push(guess);
+
         var puck = el("div","puck locked");
-        puck.style.left = r.results[pid].guess + "%";
+        puck.style.left = guess + "%";
+
+        // Stack perfectly overlapping pucks downwards
+        if (closeCount > 0) {
+            puck.style.marginTop = (closeCount * 34) + "px"; // Shift down visually
+            puck.style.zIndex = 10 + closeCount;
+            // Pad the container dynamically if we stack too many to stop them running into text
+            trackWrap.style.paddingBottom = Math.max(6, (closeCount * 34) + 6) + "px"; 
+        }
+
         var pl = view.players[pid];
         if (pl) {
           var c = nameColor(pl.name);
