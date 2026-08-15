@@ -229,23 +229,32 @@
   }
   .track.disabled{opacity:0.55;}
   .zone{position:absolute; top:0; bottom:0; border-radius:2px;}
+  
+  /* The scoring bands */
+  .target-band {
+    position: absolute;
+    top: 0; bottom: 0;
+    transform: translateX(-50%);
+    border-radius: 2px;
+  }
+  .band-4 { background: var(--amber); box-shadow: 0 0 10px rgba(255,180,84,0.7); z-index: 3; }
+  .band-3 { background: rgba(255, 180, 84, 0.55); z-index: 2; }
+  .band-2 { background: rgba(255, 180, 84, 0.25); z-index: 1; }
+
   .puck{
     position:absolute; top:50%; width:30px; height:30px; border-radius:50%;
     background:radial-gradient(circle at 35% 30%, #fff, var(--teal) 60%);
     box-shadow:0 0 0 4px rgba(94,234,212,0.18), 0 4px 14px rgba(0,0,0,0.5);
     transform:translate(-50%,-50%);
     transition:box-shadow .15s ease;
-    z-index:3;
+    z-index:4;
   }
   .puck.held{box-shadow:0 0 0 7px rgba(94,234,212,0.28), 0 4px 14px rgba(0,0,0,0.5);}
   .puck.locked{background:radial-gradient(circle at 35% 30%, #fff, var(--text-faint) 65%);}
-  .target-mark{
-    position:absolute; top:-8px; bottom:-8px; width:3px; background:var(--amber);
-    box-shadow:0 0 10px var(--amber); transform:translateX(-50%); z-index:2; border-radius:2px;
-  }
+  
   .target-star{
     position:absolute; top:50%; width:14px; height:14px; transform:translate(-50%,-50%) rotate(45deg);
-    background:var(--amber); box-shadow:0 0 12px var(--amber); z-index:2; border-radius:3px;
+    background: #fff; box-shadow:0 0 12px var(--amber); z-index:5; border-radius:3px;
   }
   .drag-hint{
     position:absolute; left:50%; top:-2px; transform:translate(-50%,-100%);
@@ -272,6 +281,18 @@
   }
   .points-badge.zero{color:var(--text-faint); text-shadow:none;}
   .reveal-sub{color:var(--text-muted); font-size:13.5px;}
+
+  .reveal-breakdown {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px;
+  }
+  .breakdown-pill {
+    background: var(--panel-raised); border: 1px solid var(--line);
+    padding: 6px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px; color: var(--text);
+  }
+  .breakdown-pill .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
 
   footer.hint{
     text-align:center; color:var(--text-faint); font-size:12px; padding:6px 0 2px;
@@ -369,8 +390,10 @@
   /* ---------------- config ---------------- */
   var ROOM_PREFIX = "wvlen-sync-";
   var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
-  var ZONES = [ {max:2, pts:4}, {max:5, pts:3}, {max:12.5, pts:2} ];
-  // Approximates the physical Wavelength dial
+  
+  // Expanded scoring zones mapping perfectly to the physical dial
+  // Widths on the track will be double the max radius (e.g. 7% wide target for 4 pts)
+  var ZONES = [ {max:3.5, pts:4}, {max:8.5, pts:3}, {max:15, pts:2} ];
 
   var TOPICS = [
     ["Bad idea at work","Great idea at work"],
@@ -595,10 +618,10 @@
     // Manage who sees whose markers mid-round
     if (state.phase === "playing") {
       if (isPsy) {
-        visibleGuesses = state.guesses;
+        visibleGuesses = state.guesses; // psychic sees all moving live
       } else {
         if (state.guesses[peerId] !== undefined) {
-          visibleGuesses[peerId] = state.guesses[peerId];
+          visibleGuesses[peerId] = state.guesses[peerId]; // player only sees theirs
         }
       }
     }
@@ -979,12 +1002,33 @@
     }
   }
 
+  function appendTargetBands(track, targetVal) {
+    // 2-point band
+    var b2 = el("div", "target-band band-2");
+    b2.style.left = targetVal + "%"; 
+    b2.style.width = (ZONES[2].max * 2) + "%";
+    track.appendChild(b2);
+
+    // 3-point band
+    var b3 = el("div", "target-band band-3");
+    b3.style.left = targetVal + "%"; 
+    b3.style.width = (ZONES[1].max * 2) + "%";
+    track.appendChild(b3);
+
+    // 4-point band
+    var b4 = el("div", "target-band band-4");
+    b4.style.left = targetVal + "%"; 
+    b4.style.width = (ZONES[0].max * 2) + "%";
+    track.appendChild(b4);
+  }
+
   function buildTrack(view, opts){
     var wrap = el("div","track-wrap");
     var track = el("div","track" + (opts.locked ? " disabled" : ""));
 
     if(opts.showTarget && view.target != null){
-      var mark = el("div","target-mark");
+      appendTargetBands(track, view.target);
+      var mark = el("div","target-star");
       mark.style.left = view.target + "%";
       track.appendChild(mark);
     }
@@ -1080,7 +1124,7 @@
     roleLine.innerHTML = "";
     var psyName = (view.players[view.psychicId]||{}).name || "Someone";
     if(view.youArePsychic){
-      roleLine.appendChild(el("span",null,"👀 Only you can see the target. Wait for everyone to lock in."));
+      roleLine.appendChild(el("span",null,"👀 Only you can see the target right now. Wait for everyone to lock in."));
     } else {
       roleLine.appendChild(el("span",null,"🔮 "));
       roleLine.appendChild(el("b",null,psyName));
@@ -1158,7 +1202,7 @@
     if (myResult) {
       var badge = el("div","points-badge" + (myResult.points===0 ? " zero" : ""), "+" + myResult.points);
       box.appendChild(badge);
-      box.appendChild(el("div","reveal-sub", (myResult.points===4 ? "Dead on the signal." : myResult.points===0 ? "Off the wavelength." : "Close enough to feel it.")));
+      box.appendChild(el("div","reveal-sub", (myResult.points===4 ? "Dead on the signal!" : myResult.points===0 ? "Off the wavelength." : "Close enough to feel it.")));
     } else if (view.youArePsychic) {
       var badgePsy = el("div","points-badge zero", "🎯");
       box.appendChild(badgePsy);
@@ -1178,6 +1222,7 @@
     var trackWrap = el("div","track-wrap");
     var track = el("div","track");
     if(r){
+      appendTargetBands(track, r.target);
       var star = el("div","target-star");
       star.style.left = r.target + "%";
       track.appendChild(star);
@@ -1205,6 +1250,26 @@
     }
     trackWrap.appendChild(track);
     wrap.appendChild(trackWrap);
+
+    // Everyone's Guesses Summary breakdown list
+    var breakdown = el("div", "reveal-breakdown");
+    if (r && r.results) {
+      for (var pid in r.results) {
+        var pl = view.players[pid];
+        var name = pl ? pl.name : "Someone";
+        
+        var pill = el("div", "breakdown-pill");
+        var dot = el("span", "dot");
+        dot.style.background = nameColor(name);
+        
+        var text = el("span", null, name + " • " + r.results[pid].points + " pts");
+        
+        pill.appendChild(dot);
+        pill.appendChild(text);
+        breakdown.appendChild(pill);
+      }
+    }
+    wrap.appendChild(breakdown);
 
     var controls = el("div","controls");
     var nextBtn = el("button","btn btn-primary", "Next Round");
