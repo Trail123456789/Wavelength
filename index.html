@@ -284,6 +284,45 @@
   }
   .breakdown-pill .dot { width: 10px; height: 10px; border-radius: 50%; }
 
+  /* ---------- round picker (lobby) ---------- */
+  .round-picker{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:2px 0 6px; }
+  .round-opt{
+    padding:10px 18px; border-radius:999px; background:var(--panel-raised); color:var(--text-muted);
+    font-weight:700; font-family:var(--font-mono); font-size:14px; border:1px solid var(--line);
+    transition:transform .12s ease, filter .12s ease;
+  }
+  .round-opt:active{ transform:scale(0.95); }
+  .round-opt.active{ background:linear-gradient(180deg,#ffc372,var(--amber)); color:#241608; border-color:var(--amber); box-shadow:0 0 14px -2px rgba(255,180,84,0.55); }
+
+  /* ---------- round badge (scorebar) ---------- */
+  .round-badge{
+    font-family:var(--font-mono); font-weight:700; font-size:12px; letter-spacing:0.04em;
+    color:#241608; background:linear-gradient(180deg,#ffc372,var(--amber));
+    padding:5px 12px; border-radius:999px; flex:none;
+  }
+
+  /* ---------- game over / leaderboard ---------- */
+  .gameover-wrap{ gap:14px; }
+  .winner-spotlight{ display:flex; flex-direction:column; align-items:center; gap:2px; margin:2px 0 6px; }
+  .winner-crown{ font-size:36px; filter:drop-shadow(0 0 10px rgba(255,180,84,0.6)); animation:crownPop .5s ease; }
+  @keyframes crownPop{ 0%{transform:scale(0.4) translateY(6px); opacity:0;} 100%{transform:scale(1) translateY(0); opacity:1;} }
+  .winner-name{ font-family:var(--font-display); font-weight:700; font-size:23px; color:var(--amber); }
+  .winner-score{ font-family:var(--font-mono); font-size:13.5px; color:var(--text-muted); }
+
+  .leaderboard{ display:flex; flex-direction:column; gap:8px; width:100%; }
+  .lb-row{
+    display:flex; align-items:center; gap:12px;
+    background:var(--panel-raised); border:1px solid var(--line); border-radius:var(--radius-md);
+    padding:11px 14px;
+  }
+  .lb-row.rank-1{ border-color:var(--amber); background:linear-gradient(90deg, rgba(255,180,84,0.16), var(--panel-raised) 70%); box-shadow:0 0 18px -6px rgba(255,180,84,0.5); }
+  .lb-row.rank-2{ border-color:#c7d2d6; background:linear-gradient(90deg, rgba(199,210,214,0.12), var(--panel-raised) 70%); }
+  .lb-row.rank-3{ border-color:#d99a6c; background:linear-gradient(90deg, rgba(217,154,108,0.14), var(--panel-raised) 70%); }
+  .lb-rank{ font-family:var(--font-mono); font-weight:700; font-size:15px; width:28px; text-align:center; flex:none; }
+  .lb-name{ flex:1; display:flex; align-items:center; gap:8px; font-weight:600; font-size:14.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lb-dot{ width:10px; height:10px; border-radius:50%; flex:none; }
+  .lb-score{ font-family:var(--font-mono); font-weight:700; font-size:14.5px; color:var(--text-muted); flex:none; }
+
   footer.hint{ text-align:center; color:var(--text-faint); font-size:12px; padding:6px 0 2px; }
 
   @media (max-width:380px){
@@ -532,7 +571,10 @@
     locks: {},            
     scores: {},           
     lastResult: null,
-    history: []
+    history: [],
+    totalRounds: 10,     // configurable game length — a "round" is one full lap through playerOrder
+    roundNumber: 1,      // current round (1-indexed) while a game is in progress
+    turnsThisRound: 0    // psychic turns completed since the current round began
   };
 
   /* ---------------- landing screen wiring ---------------- */
@@ -690,7 +732,9 @@
       locks: state.locks,
       lastResult: state.lastResult,
       scores: state.scores,
-      youArePsychic: isPsy
+      youArePsychic: isPsy,
+      totalRounds: state.totalRounds,
+      roundNumber: state.roundNumber
     };
   }
 
@@ -737,6 +781,24 @@
         nextIdx = (nextIdx + 1) % state.playerOrder.length;
         loopCount++;
     }
+
+    // A round is one full lap through the current player list. Count the
+    // turn that just ended, and if that completes a lap, check whether
+    // we've hit the configured game length.
+    state.turnsThisRound++;
+    if (state.turnsThisRound >= state.playerOrder.length) {
+      state.turnsThisRound = 0;
+      state.roundNumber++;
+    }
+
+    if (state.totalRounds && state.roundNumber > state.totalRounds) {
+      state.phase = "gameover";
+      state.psychicId = null;
+      state.topic = null; state.target = null;
+      state.guesses = {}; state.locks = {};
+      return;
+    }
+
     state.psychicId = state.playerOrder[nextIdx];
     state.phase = "choosing";
     state.topic = null; state.target = null;
@@ -769,8 +831,17 @@
         }
         break;
       case "startGame":
+        if (fromId !== state.hostId) return;
         if (state.phase !== "idle") return;
         if (state.playerOrder.length === 0) return;
+        var rounds = Math.round(Number(action.totalRounds));
+        if (!rounds || rounds < 1) rounds = 10;
+        state.totalRounds = clamp(rounds, 1, 100);
+        state.roundNumber = 1;
+        state.turnsThisRound = 0;
+        state.scores = {};
+        state.playerOrder.forEach(function(pid){ state.scores[pid] = 0; });
+        state.history = [];
         state.psychicId = state.playerOrder[0];
         state.phase = "choosing";
         state.topic = null; state.target = null;
@@ -816,6 +887,18 @@
       case "nextRound":
         if (state.phase !== "revealed") return;
         advancePsychic();
+        break;
+      case "playAgain":
+        if (fromId !== state.hostId) return;
+        if (state.phase !== "gameover") return;
+        state.phase = "idle";
+        state.psychicId = null;
+        state.topic = null; state.target = null;
+        state.guesses = {}; state.locks = {};
+        state.roundNumber = 1; state.turnsThisRound = 0;
+        state.scores = {};
+        state.playerOrder.forEach(function(pid){ state.scores[pid] = 0; });
+        state.history = [];
         break;
       default: return;
     }
@@ -960,22 +1043,40 @@
     });
   }
 
+  function rankPlayers(view){
+    var arr = view.playerOrder
+      .filter(function(pid){ return !!view.players[pid]; })
+      .map(function(pid){
+        return { pid: pid, name: view.players[pid].name, online: view.players[pid].online, score: (view.scores && view.scores[pid]) || 0 };
+      })
+      .sort(function(a,b){ return b.score - a.score; });
+    var rank = 0, lastScore = null;
+    arr.forEach(function(p, i){
+      if (p.score !== lastScore) { rank = i + 1; lastScore = p.score; }
+      p.rank = rank;
+    });
+    return arr;
+  }
+
   function renderScorebar(view){
     var sb = $("scorebar");
     if(!sb) return;
     sb.innerHTML = "";
-    
-    view.playerOrder.forEach(function(pid){
-      var pl = view.players[pid];
-      if(!pl) return;
-      
+
+    if (view.phase === "gameover") { sb.classList.add("hidden"); return; }
+    sb.classList.remove("hidden");
+
+    if (view.phase === "choosing" || view.phase === "playing" || view.phase === "revealed") {
+      sb.appendChild(el("div","round-badge","Round " + view.roundNumber + "/" + view.totalRounds));
+    }
+
+    var medals = {1:"🥇 ", 2:"🥈 ", 3:"🥉 "};
+    rankPlayers(view).forEach(function(p){
       var div = el("div", "player-score");
-      div.style.color = nameColor(pl.name);
-      if(!pl.online) div.style.opacity = 0.5;
-      
-      var pts = view.scores[pid] || 0;
-      div.textContent = pl.name + ": " + pts + " pts";
-      
+      div.style.color = nameColor(p.name);
+      if(!p.online) div.style.opacity = 0.5;
+      var medal = (p.score > 0 && medals[p.rank]) ? medals[p.rank] : "";
+      div.textContent = medal + p.name + ": " + p.score + " pts";
       sb.appendChild(div);
     });
   }
@@ -1017,6 +1118,7 @@
     if(view.phase === "choosing"){ panel.appendChild(buildChoosingPane(view)); return; }
     if(view.phase === "playing"){ panel.appendChild(buildPlayingPane(view)); return; }
     if(view.phase === "revealed"){ panel.appendChild(buildRevealedPane(view)); return; }
+    if(view.phase === "gameover"){ panel.appendChild(buildGameOverPane(view)); return; }
   }
 
   function el(tag, cls, text){
@@ -1026,17 +1128,38 @@
     return e;
   }
 
+  var pendingRoundChoice = 10; // host's local pre-game pick — not synced until Start Game is pressed
+
   function buildIdlePane(view){
     var wrap = el("div","state-msg");
     wrap.appendChild(el("div","big-emoji","📡"));
     wrap.appendChild(el("h2",null,"Ready to connect?"));
-    wrap.appendChild(el("p",null,"Everyone will get a turn to give a clue. Start the game when everyone is in."));
-    
-    var startBtn = el("button","btn btn-primary btn-block", "Start Game");
-    startBtn.type = "button";
-    startBtn.addEventListener("click", function(){ sendAction({t:"startGame"}); });
-    wrap.appendChild(startBtn);
-    
+    wrap.appendChild(el("p",null,"Everyone will get a turn to give a clue. A round is one full lap through the group."));
+
+    if(view.isRoomHost){
+      wrap.appendChild(el("div","eyebrow","HOW MANY ROUNDS?"));
+      var group = el("div","round-picker");
+      [5,10,15,20,25].forEach(function(n){
+        var b = el("button","round-opt" + (n===pendingRoundChoice ? " active" : ""), String(n));
+        b.type = "button";
+        b.addEventListener("click", function(){
+          pendingRoundChoice = n;
+          var opts = group.querySelectorAll(".round-opt");
+          for(var i=0;i<opts.length;i++){ opts[i].classList.remove("active"); }
+          b.classList.add("active");
+        });
+        group.appendChild(b);
+      });
+      wrap.appendChild(group);
+
+      var startBtn = el("button","btn btn-primary btn-block", "Start Game");
+      startBtn.type = "button";
+      startBtn.addEventListener("click", function(){ sendAction({t:"startGame", totalRounds: pendingRoundChoice}); });
+      wrap.appendChild(startBtn);
+    } else {
+      wrap.appendChild(el("p",null,"Waiting for the host to pick a round count and start the game…"));
+    }
+
     return wrap;
   }
 
@@ -1409,6 +1532,51 @@
     nextBtn.addEventListener("click", function(){ sendAction({t:"nextRound"}); });
     controls.appendChild(nextBtn);
     wrap.appendChild(controls);
+
+    return wrap;
+  }
+
+  function buildGameOverPane(view){
+    var wrap = el("div","state-msg gameover-wrap");
+    wrap.appendChild(el("div","big-emoji","🏆"));
+    wrap.appendChild(el("h2",null,"Game over!"));
+    wrap.appendChild(el("p",null, view.totalRounds + " rounds down. Here's how everyone landed."));
+
+    var ranked = rankPlayers(view);
+    var winner = ranked.length ? ranked[0] : null;
+
+    if(winner){
+      var spotlight = el("div","winner-spotlight");
+      spotlight.appendChild(el("div","winner-crown","👑"));
+      spotlight.appendChild(el("div","winner-name", winner.name));
+      spotlight.appendChild(el("div","winner-score", winner.score + " pts"));
+      wrap.appendChild(spotlight);
+    }
+
+    var board = el("div","leaderboard");
+    ranked.forEach(function(p){
+      var row = el("div","lb-row rank-" + Math.min(p.rank,4));
+      row.appendChild(el("div","lb-rank", p.rank===1 ? "🥇" : p.rank===2 ? "🥈" : p.rank===3 ? "🥉" : ("#"+p.rank)));
+      var nameEl = el("div","lb-name");
+      var dot = el("span","lb-dot"); dot.style.background = nameColor(p.name);
+      nameEl.appendChild(dot);
+      nameEl.appendChild(document.createTextNode(p.name + (p.online ? "" : " (left)")));
+      row.appendChild(nameEl);
+      row.appendChild(el("div","lb-score", p.score + " pts"));
+      board.appendChild(row);
+    });
+    wrap.appendChild(board);
+
+    if(view.isRoomHost){
+      var controls = el("div","controls");
+      var againBtn = el("button","btn btn-primary btn-block","🔁 Play again");
+      againBtn.type = "button";
+      againBtn.addEventListener("click", function(){ sendAction({t:"playAgain"}); });
+      controls.appendChild(againBtn);
+      wrap.appendChild(controls);
+    } else {
+      wrap.appendChild(el("p",null,"Waiting for the host to start a new game…"));
+    }
 
     return wrap;
   }
