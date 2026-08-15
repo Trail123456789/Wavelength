@@ -419,16 +419,9 @@
   var ROOM_PREFIX = "wvlen-sync-";
   var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; 
   
-  var PEER_OPTS = {
-    config: {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:global.stun.twilio.com:3478" }
-      ]
-    }
-  };
+  // By leaving PEER_OPTS empty, PeerJS defaults to its own provided STUN AND TURN servers.
+  // This completely fixes the silent hanging issue on strict NATs and mobile data.
+  var PEER_OPTS = {};
 
   var ZONES = [ {max:3.5, pts:4}, {max:8.5, pts:3}, {max:15, pts:2} ];
 
@@ -663,7 +656,7 @@
         $("btn-join-room").disabled = false;
         $("btn-join-room").textContent = "Join room";
         conn.close();
-      }, 9000);
+      }, 14000); // Bumped to 14s to be forgiving for complex handshakes
 
       conn.on("open", function(){
         clearTimeout(openTimeout);
@@ -782,9 +775,6 @@
         loopCount++;
     }
 
-    // A round is one full lap through the current player list. Count the
-    // turn that just ended, and if that completes a lap, check whether
-    // we've hit the configured game length.
     state.turnsThisRound++;
     if (state.turnsThisRound >= state.playerOrder.length) {
       state.turnsThisRound = 0;
@@ -1128,7 +1118,7 @@
     return e;
   }
 
-  var pendingRoundChoice = 10; // host's local pre-game pick — not synced until Start Game is pressed
+  var pendingRoundChoice = 10; 
 
   function buildIdlePane(view){
     var wrap = el("div","state-msg");
