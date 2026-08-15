@@ -189,22 +189,13 @@
   .toast button{background:var(--danger); color:#2a0e0e; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700;}
 
   .scorebar{
-    display:flex; align-items:center; justify-content:space-between;
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:center;
     background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-md);
-    padding:11px 16px;
+    padding:11px 16px; min-height: 48px;
   }
-  .scorebar .total{font-family:var(--font-display); font-weight:700; font-size:18px;}
-  .scorebar .total span{color:var(--amber);}
-  .history{display:flex; gap:6px; overflow-x:auto; max-width:55%;}
-  .history::-webkit-scrollbar{display:none;}
-  .hist-pip{
-    flex:none; width:26px; height:26px; border-radius:8px; font-family:var(--font-mono);
-    font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;
-    background:var(--track-groove); color:var(--text-muted); border:1px solid var(--line);
+  .player-score{
+    font-family:var(--font-mono); font-size:14px; font-weight:700;
   }
-  .hist-pip.p4{background:var(--amber); color:#241608; border-color:var(--amber);}
-  .hist-pip.p3{background:rgba(255,180,84,0.55); color:#241608; border-color:transparent;}
-  .hist-pip.p2{background:rgba(255,180,84,0.28); color:var(--text); border-color:transparent;}
 
   /* ---------- main panel ---------- */
   .panel{
@@ -358,16 +349,15 @@
       <button id="btn-reconnect" type="button">Reconnect</button>
     </div>
 
-    <div class="scorebar">
-      <div class="total">⚡ <span id="total-score">0</span> pts</div>
-      <div class="history" id="history-row"></div>
+    <div class="scorebar" id="scorebar">
+      <!-- Player individual scores populate dynamically here -->
     </div>
 
     <div class="panel" id="main-panel">
       <!-- filled by renderApp() -->
     </div>
 
-    <footer class="hint">Give your clue out loud over Discord — this screen just holds the shared marker.</footer>
+    <footer class="hint">Give your clue out loud over Discord — this screen just holds the shared markers.</footer>
   </section>
 
 </div>
@@ -380,10 +370,7 @@
   var ROOM_PREFIX = "wvlen-sync-";
   var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
   var ZONES = [ {max:2, pts:4}, {max:5, pts:3}, {max:12.5, pts:2} ];
-  // Approximates the physical Wavelength dial: published reviews of the
-  // game describe the colored target wedge as covering roughly a quarter
-  // of the dial's width, narrowing toward the center in 4/3/2-point bands.
-  // 12.5% on each side of the target = 25% of the scale total.
+  // Approximates the physical Wavelength dial
 
   var TOPICS = [
     ["Bad idea at work","Great idea at work"],
@@ -417,7 +404,7 @@
   /* ---------------- tiny utils ---------------- */
   function $(id){ return document.getElementById(id); }
   function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-  function esc(s){ return (s==null) ? "" : String(s); } // used only with textContent, never innerHTML
+  function esc(s){ return (s==null) ? "" : String(s); }
   function randomCode(len){
     var s = "";
     for(var i=0;i<len;i++) s += CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)];
@@ -455,22 +442,22 @@
   var isHost = false;
   var myId = null;
   var myName = "Player";
-  var hostConn = null;            // joiner -> connection to host
-  var connections = {};           // host -> { peerId: DataConnection }
+  var hostConn = null;            
+  var connections = {};           
   var roomCode = null;
 
-  // canonical game state (lives on host only; clients hold last-received view)
+  // canonical game state (lives on host only)
   var state = {
-    players: {},          // id -> {id, name}
+    players: {},          
+    playerOrder: [],      // tracks active players for circulating rounds seamlessly
     psychicId: null,
-    phase: "idle",         // idle | choosing | playing | revealed
-    topic: null,           // {a,b}
-    target: null,          // 0-100, host-only truth
-    sliderValue: 50,
-    locked: false,
-    draggingBy: null,
+    phase: "idle",        // idle | choosing | playing | revealed
+    topic: null,           
+    target: null,         
+    guesses: {},          // pid -> value
+    locks: {},            // pid -> locked (bool)
+    scores: {},           // pid -> total score
     lastResult: null,
-    totalScore: 0,
     history: []
   };
 
@@ -514,6 +501,9 @@
       settled = true;
       peer = p; isHost = true; myId = id; roomCode = code;
       state.players[myId] = {id: myId, name: name};
+      state.playerOrder = [myId];
+      state.scores = {};
+      state.scores[myId] = 0;
       enterGameScreen();
     });
 
@@ -599,34 +589,91 @@
 
   function viewFor(peerId){
     var revealTarget = (state.phase === "revealed") || (peerId === state.psychicId);
+    var isPsy = (peerId === state.psychicId);
+    var visibleGuesses = {};
+    
+    // Manage who sees whose markers mid-round
+    if (state.phase === "playing") {
+      if (isPsy) {
+        visibleGuesses = state.guesses;
+      } else {
+        if (state.guesses[peerId] !== undefined) {
+          visibleGuesses[peerId] = state.guesses[peerId];
+        }
+      }
+    }
+    
     return {
       youId: peerId,
       players: state.players,
+      playerOrder: state.playerOrder,
       psychicId: state.psychicId,
       phase: state.phase,
       topic: state.topic,
       target: revealTarget ? state.target : null,
-      sliderValue: state.sliderValue,
-      locked: state.locked,
-      draggingBy: state.draggingBy,
+      guesses: visibleGuesses,
+      myLock: state.locks[peerId] || false,
+      locks: state.locks,
       lastResult: state.lastResult,
-      totalScore: state.totalScore,
-      history: state.history,
-      youArePsychic: peerId === state.psychicId
+      scores: state.scores,
+      youArePsychic: isPsy
     };
+  }
+
+  function checkAutoReveal(force) {
+    if (state.phase !== "playing") return;
+    var allLocked = true;
+    var guessersCount = 0;
+    
+    state.playerOrder.forEach(function(pid) {
+      if (pid !== state.psychicId) {
+        guessersCount++;
+        if (!state.locks[pid]) allLocked = false;
+      }
+    });
+
+    if ((guessersCount > 0 && allLocked) || force) {
+      var results = {};
+      state.playerOrder.forEach(function(pid) {
+        if (pid !== state.psychicId) {
+          var g = state.guesses[pid] || 50;
+          var pts = scoreFor(state.target, g);
+          state.scores[pid] = (state.scores[pid] || 0) + pts;
+          results[pid] = { guess: g, points: pts };
+        }
+      });
+      
+      state.phase = "revealed";
+      state.lastResult = {
+        target: state.target,
+        a: state.topic.a, b: state.topic.b,
+        psychicName: (state.players[state.psychicId]||{}).name || "Someone",
+        results: results
+      };
+      state.history.push(state.lastResult);
+    }
   }
 
   function handleAction(fromId, action){
     switch(action.t){
       case "join":
         state.players[fromId] = {id: fromId, name: sanitizeName(action.name)};
+        if (!state.playerOrder.includes(fromId)) {
+          state.playerOrder.push(fromId);
+          state.scores[fromId] = 0;
+          if (state.phase === "playing") {
+            state.guesses[fromId] = 50;
+            state.locks[fromId] = false;
+          }
+        }
         break;
-      case "claimPsychic":
-        state.psychicId = fromId;
+      case "startGame":
+        if (state.phase !== "idle") return;
+        if (state.playerOrder.length === 0) return;
+        state.psychicId = state.playerOrder[0];
         state.phase = "choosing";
         state.topic = null; state.target = null;
-        state.sliderValue = 50; state.locked = false;
-        state.draggingBy = null; state.lastResult = null;
+        state.guesses = {}; state.locks = {};
         break;
       case "startRound":
         if(fromId !== state.psychicId) return;
@@ -635,41 +682,40 @@
         state.topic = {a:a, b:b};
         state.target = Math.random()*100;
         state.phase = "playing";
-        state.sliderValue = 50; state.locked = false; state.draggingBy = null;
-        break;
-      case "dragStart":
-        if(fromId === state.psychicId || state.locked) return;
-        if(state.draggingBy && state.draggingBy !== fromId) return;
-        state.draggingBy = fromId;
+        state.guesses = {};
+        state.locks = {};
+        state.playerOrder.forEach(function(pid) {
+          if (pid !== state.psychicId) {
+            state.guesses[pid] = 50;
+            state.locks[pid] = false;
+          }
+        });
         break;
       case "drag":
-        if(fromId === state.psychicId || state.locked) return;
-        if(state.draggingBy !== fromId) return;
-        state.sliderValue = clamp(Number(action.value)||0, 0, 100);
-        break;
-      case "dragEnd":
-        if(state.draggingBy === fromId) state.draggingBy = null;
+        if(fromId === state.psychicId || state.locks[fromId]) return;
+        state.guesses[fromId] = clamp(Number(action.value)||0, 0, 100);
         break;
       case "lock":
         if(fromId === state.psychicId || state.phase !== "playing") return;
-        state.locked = true; state.draggingBy = null;
+        state.locks[fromId] = true;
+        checkAutoReveal();
         break;
       case "unlock":
         if(fromId === state.psychicId || state.phase !== "playing") return;
-        state.locked = false;
+        state.locks[fromId] = false;
         break;
-      case "reveal":
-        if(fromId !== state.psychicId || !state.locked || state.phase !== "playing") return;
-        var pts = scoreFor(state.target, state.sliderValue);
-        var result = {
-          points: pts, target: state.target, guess: state.sliderValue,
-          a: state.topic.a, b: state.topic.b,
-          psychicName: (state.players[state.psychicId]||{}).name || "Someone"
-        };
-        state.phase = "revealed";
-        state.lastResult = result;
-        state.totalScore += pts;
-        state.history.push(result);
+      case "forceReveal":
+        if (fromId !== state.psychicId || state.phase !== "playing") return;
+        checkAutoReveal(true);
+        break;
+      case "nextRound":
+        if (state.phase !== "revealed") return;
+        var currentIdx = state.playerOrder.indexOf(state.psychicId);
+        var nextIdx = (currentIdx + 1) % state.playerOrder.length;
+        state.psychicId = state.playerOrder[nextIdx];
+        state.phase = "choosing";
+        state.topic = null; state.target = null;
+        state.guesses = {}; state.locks = {};
         break;
       default: return;
     }
@@ -685,10 +731,19 @@
     conn.on("close", function(){
       delete connections[conn.peer];
       delete state.players[conn.peer];
+      state.playerOrder = state.playerOrder.filter(function(id) { return id !== conn.peer; });
+      
       if(state.psychicId === conn.peer){
-        state.psychicId = null; state.phase = "idle"; state.topic=null; state.target=null; state.locked=false; state.draggingBy=null;
+        if (state.playerOrder.length > 0) {
+          state.psychicId = state.playerOrder[0];
+          state.phase = "choosing";
+        } else {
+          state.psychicId = null; 
+          state.phase = "idle";
+        }
+      } else {
+        checkAutoReveal(); // Failsafe Auto-Reveal if wait loop breaks
       }
-      if(state.draggingBy === conn.peer) state.draggingBy = null;
       broadcastState();
     });
   }
@@ -767,15 +822,9 @@
 
   /* ================= RENDERING ================= */
   var currentView = null;
-  // Fast-path refs: while a round is in progress, slider/drag updates arrive
-  // many times per second. Rebuilding the panel's innerHTML on every one of
-  // those would destroy and recreate the puck element mid-gesture, which
-  // silently breaks the active pointer-capture drag. So the panel is only
-  // fully rebuilt when something *structural* changes (phase, topic, who's
-  // psychic, locked state, reveal result); slider position and "who's
-  // holding it" text are patched in place via these refs instead.
+  // Fast-path rendering
   var panelStructKey = null;
-  var puckRef = null;
+  var puckRefs = {};
   var roleLineRef = null;
 
   function renderApp(view){
@@ -801,14 +850,21 @@
   }
 
   function renderScorebar(view){
-    $("total-score").textContent = view.totalScore || 0;
-    var histEl = $("history-row");
-    histEl.innerHTML = "";
-    (view.history || []).slice(-12).forEach(function(r){
-      var pip = document.createElement("div");
-      pip.className = "hist-pip p" + r.points;
-      pip.textContent = r.points;
-      histEl.appendChild(pip);
+    var sb = $("scorebar");
+    if(!sb) return;
+    sb.innerHTML = "";
+    
+    view.playerOrder.forEach(function(pid){
+      var pl = view.players[pid];
+      if(!pl) return;
+      
+      var div = el("div", "player-score");
+      div.style.color = nameColor(pl.name);
+      
+      var pts = view.scores[pid] || 0;
+      div.textContent = pl.name + ": " + pts + " pts";
+      
+      sb.appendChild(div);
     });
   }
 
@@ -817,24 +873,30 @@
       view.phase,
       view.topic ? (view.topic.a + "|" + view.topic.b) : "",
       view.psychicId,
-      view.locked ? "1" : "0",
-      view.youArePsychic ? "1" : "0",
-      view.lastResult ? (view.lastResult.target + "|" + view.lastResult.guess + "|" + view.lastResult.points) : ""
+      view.myLock ? "1" : "0",
+      view.youArePsychic ? ("psy_locks_" + Object.keys(view.locks).filter(function(k){ return view.locks[k]; }).length) : "0",
+      view.lastResult ? (view.lastResult.target) : ""
     ].join("::");
   }
 
   function renderPanel(view){
     var key = structKey(view);
-    if(view.phase === "playing" && key === panelStructKey && puckRef){
-      // fast path: same round, same structure — just patch positions
-      puckRef.style.left = clamp(view.sliderValue,0,100) + "%";
-      puckRef.setAttribute("aria-valuenow", String(Math.round(view.sliderValue)));
-      puckRef.classList.toggle("held", !!view.draggingBy);
+    if(view.phase === "playing" && key === panelStructKey){
+      // fast path: dynamically update only active slider(s) without trashing capturing limits 
+      for(var pid in view.guesses){
+        if(puckRefs[pid]){
+          puckRefs[pid].style.left = clamp(view.guesses[pid],0,100) + "%";
+          if(pid === view.youId) {
+             puckRefs[pid].setAttribute("aria-valuenow", String(Math.round(view.guesses[pid])));
+          }
+        }
+      }
       if(roleLineRef) fillRoleLine(roleLineRef, view);
       return;
     }
+    
     panelStructKey = key;
-    puckRef = null;
+    puckRefs = {};
     roleLineRef = null;
 
     var panel = $("main-panel");
@@ -853,19 +915,17 @@
     return e;
   }
 
-  function claimButton(label){
-    var b = el("button", "btn btn-primary btn-block", label);
-    b.type = "button";
-    b.addEventListener("click", function(){ sendAction({t:"claimPsychic"}); });
-    return b;
-  }
-
   function buildIdlePane(view){
     var wrap = el("div","state-msg");
     wrap.appendChild(el("div","big-emoji","📡"));
-    wrap.appendChild(el("h2",null,"Nobody's reading the signal yet"));
-    wrap.appendChild(el("p",null,"One of you needs to pick a topic and hold the hidden target. Everyone else guesses where it sits."));
-    wrap.appendChild(claimButton("🔮 I'll give the clue"));
+    wrap.appendChild(el("h2",null,"Ready to connect?"));
+    wrap.appendChild(el("p",null,"Everyone will get a turn to give a clue. Start the game when everyone is in."));
+    
+    var startBtn = el("button","btn btn-primary btn-block", "Start Game");
+    startBtn.type = "button";
+    startBtn.addEventListener("click", function(){ sendAction({t:"startGame"}); });
+    wrap.appendChild(startBtn);
+    
     return wrap;
   }
 
@@ -920,7 +980,6 @@
   }
 
   function buildTrack(view, opts){
-    // opts: {showTarget:bool, draggable:bool, locked:bool}
     var wrap = el("div","track-wrap");
     var track = el("div","track" + (opts.locked ? " disabled" : ""));
 
@@ -930,28 +989,46 @@
       track.appendChild(mark);
     }
 
-    var puck = el("div","puck" + (view.draggingBy ? " held" : "") + (opts.locked ? " locked" : ""));
-    puck.style.left = clamp(view.sliderValue,0,100) + "%";
-    puck.setAttribute("role","slider");
-    puck.setAttribute("aria-valuemin","0");
-    puck.setAttribute("aria-valuemax","100");
-    puck.setAttribute("aria-valuenow", String(Math.round(view.sliderValue)));
-    puck.setAttribute("tabindex", opts.draggable ? "0" : "-1");
-    track.appendChild(puck);
+    if (view.guesses) {
+      for (var pid in view.guesses) {
+        var puck = el("div","puck" + (opts.locked || view.locks[pid] ? " locked" : ""));
+        puck.style.left = clamp(view.guesses[pid],0,100) + "%";
+        
+        var pl = view.players[pid];
+        if (pl) {
+          var c = nameColor(pl.name);
+          puck.style.background = "radial-gradient(circle at 35% 30%, #fff, " + c + " 60%)";
+          var cGlow = c.replace('hsl', 'hsla').replace(')', ', 0.2)');
+          puck.style.boxShadow = "0 0 0 4px " + cGlow + ", 0 4px 14px rgba(0,0,0,0.5)";
+          puck.textContent = initials(pl.name);
+          puck.style.display = "flex";
+          puck.style.alignItems = "center";
+          puck.style.justifyContent = "center";
+          puck.style.fontSize = "12px";
+          puck.style.fontWeight = "700";
+          puck.style.color = "#0a0f12";
+        }
+
+        if (opts.draggable && pid === view.youId) {
+          puck.setAttribute("role","slider");
+          puck.setAttribute("aria-valuemin","0");
+          puck.setAttribute("aria-valuemax","100");
+          puck.setAttribute("aria-valuenow", String(Math.round(view.guesses[pid])));
+          puck.setAttribute("tabindex", "0");
+          bindDrag(track, puck);
+        }
+        track.appendChild(puck);
+        puckRefs[pid] = puck;
+      }
+    }
 
     wrap.appendChild(track);
-    puckRef = puck; // let the fast-path renderer patch this element directly
-
-    if(opts.draggable){
-      bindDrag(track, puck);
-    }
     return wrap;
   }
 
   function bindDrag(track, puck){
     var dragging = false;
-    var lastSendTs = 0;
-    var SEND_INTERVAL = 30; // ms — throttles network chatter, not the local puck
+    
     function pctFromEvent(evt){
       var rect = track.getBoundingClientRect();
       var x = clamp(evt.clientX - rect.left, 0, rect.width);
@@ -962,45 +1039,40 @@
       puck.setAttribute("aria-valuenow", String(Math.round(pct)));
     }
     function onDown(evt){
-      if(currentView && currentView.locked) return;
-      if(currentView && currentView.draggingBy && currentView.draggingBy !== currentView.youId) return;
+      if(currentView && currentView.myLock) return;
       dragging = true;
+      puck.classList.add("held");
       track.setPointerCapture && track.setPointerCapture(evt.pointerId);
       var pct = pctFromEvent(evt);
       moveLocalPuck(pct);
-      lastSendTs = Date.now();
-      sendAction({t:"dragStart"});
       sendAction({t:"drag", value: pct});
       evt.preventDefault();
     }
     function onMove(evt){
       if(!dragging) return;
       var pct = pctFromEvent(evt);
-      moveLocalPuck(pct); // instant, zero-latency local feedback
-      var now = Date.now();
-      if(now - lastSendTs >= SEND_INTERVAL){
-        lastSendTs = now;
-        sendAction({t:"drag", value: pct});
-      }
+      moveLocalPuck(pct); // zero-latency local feedback
+      sendAction({t:"drag", value: pct});
       evt.preventDefault();
     }
     function onUp(evt){
       if(!dragging) return;
       dragging = false;
-      sendAction({t:"drag", value: pctFromEvent(evt)}); // final exact position, unthrottled
-      sendAction({t:"dragEnd"});
+      puck.classList.remove("held");
+      sendAction({t:"drag", value: pctFromEvent(evt)}); 
     }
     track.addEventListener("pointerdown", onDown);
     track.addEventListener("pointermove", onMove);
     track.addEventListener("pointerup", onUp);
     track.addEventListener("pointercancel", onUp);
+    
     // keyboard support
     puck.addEventListener("keydown", function(evt){
-      if(currentView && currentView.locked) return;
+      if(currentView && currentView.myLock) return;
       var step = evt.shiftKey ? 10 : 2;
-      var cur = currentView ? currentView.sliderValue : 50;
-      if(evt.key === "ArrowLeft"){ var v1=clamp(cur-step,0,100); moveLocalPuck(v1); sendAction({t:"dragStart"}); sendAction({t:"drag", value:v1}); sendAction({t:"dragEnd"}); evt.preventDefault(); }
-      if(evt.key === "ArrowRight"){ var v2=clamp(cur+step,0,100); moveLocalPuck(v2); sendAction({t:"dragStart"}); sendAction({t:"drag", value:v2}); sendAction({t:"dragEnd"}); evt.preventDefault(); }
+      var cur = (currentView && currentView.guesses && currentView.guesses[currentView.youId]) || 50;
+      if(evt.key === "ArrowLeft"){ var v1=clamp(cur-step,0,100); moveLocalPuck(v1); sendAction({t:"drag", value:v1}); evt.preventDefault(); }
+      if(evt.key === "ArrowRight"){ var v2=clamp(cur+step,0,100); moveLocalPuck(v2); sendAction({t:"drag", value:v2}); evt.preventDefault(); }
     });
   }
 
@@ -1008,14 +1080,11 @@
     roleLine.innerHTML = "";
     var psyName = (view.players[view.psychicId]||{}).name || "Someone";
     if(view.youArePsychic){
-      roleLine.appendChild(el("span",null,"👀 Only you can see the target. Give your clue out loud — don't touch the marker."));
-    } else if(view.draggingBy){
-      var dName = (view.players[view.draggingBy]||{}).name || "Someone";
-      roleLine.appendChild(el("span",null, (view.draggingBy===view.youId ? "You're" : dName + " is") + " holding the marker"));
+      roleLine.appendChild(el("span",null,"👀 Only you can see the target. Wait for everyone to lock in."));
     } else {
       roleLine.appendChild(el("span",null,"🔮 "));
       roleLine.appendChild(el("b",null,psyName));
-      roleLine.appendChild(el("span",null," is giving the clue — drag together to place your guess."));
+      roleLine.appendChild(el("span",null," is giving the clue — drag to place your guess."));
     }
   }
 
@@ -1031,17 +1100,17 @@
     topicRow.appendChild(el("div","topic-label b", view.topic ? view.topic.b : "Point B"));
     wrap.appendChild(topicRow);
 
-    var draggable = !view.youArePsychic && !view.locked;
-    wrap.appendChild(buildTrack(view, {showTarget: view.youArePsychic, draggable: draggable, locked: view.locked}));
+    var draggable = !view.youArePsychic && !view.myLock;
+    wrap.appendChild(buildTrack(view, {showTarget: view.youArePsychic, draggable: draggable, locked: view.myLock}));
 
     var roleLine = el("div","role-line");
     fillRoleLine(roleLine, view);
     wrap.appendChild(roleLine);
-    roleLineRef = roleLine; // let the fast-path renderer patch this in place
+    roleLineRef = roleLine; 
 
     var controls = el("div","controls");
     if(!view.youArePsychic){
-      if(!view.locked){
+      if(!view.myLock){
         var lockBtn = el("button","btn btn-teal","Lock in guess");
         lockBtn.type="button";
         lockBtn.addEventListener("click", function(){ sendAction({t:"lock"}); });
@@ -1053,11 +1122,25 @@
         controls.appendChild(unlockBtn);
       }
     } else {
-      var revealBtn = el("button","btn btn-primary", view.locked ? "🎯 Reveal target" : "Waiting for the group to lock in…");
-      revealBtn.type="button";
-      revealBtn.disabled = !view.locked;
-      revealBtn.addEventListener("click", function(){ sendAction({t:"reveal"}); });
-      controls.appendChild(revealBtn);
+      var lockedCount = 0;
+      var totalGuessers = 0;
+      view.playerOrder.forEach(function(pid){
+        if(pid !== view.psychicId){
+          totalGuessers++;
+          if(view.locks[pid]) lockedCount++;
+        }
+      });
+      if (totalGuessers === 0) {
+        var forceRevealBtn = el("button","btn btn-primary", "Reveal (No Guessers)");
+        forceRevealBtn.type="button";
+        forceRevealBtn.addEventListener("click", function(){ sendAction({t:"forceReveal"}); });
+        controls.appendChild(forceRevealBtn);
+      } else {
+        var statusBtn = el("button","btn btn-primary", "Waiting... (" + lockedCount + "/" + totalGuessers + " locked)");
+        statusBtn.type="button";
+        statusBtn.disabled = true;
+        controls.appendChild(statusBtn);
+      }
     }
     wrap.appendChild(controls);
 
@@ -1070,9 +1153,21 @@
 
     var r = view.lastResult;
     var box = el("div","reveal-box");
-    var badge = el("div","points-badge" + (r && r.points===0 ? " zero" : ""), r ? ("+" + r.points) : "+0");
-    box.appendChild(badge);
-    box.appendChild(el("div","reveal-sub", r ? (r.points===4 ? "Dead on the signal." : r.points===0 ? "Off the wavelength." : "Close enough to feel it.") : ""));
+    
+    var myResult = r && r.results && r.results[view.youId];
+    if (myResult) {
+      var badge = el("div","points-badge" + (myResult.points===0 ? " zero" : ""), "+" + myResult.points);
+      box.appendChild(badge);
+      box.appendChild(el("div","reveal-sub", (myResult.points===4 ? "Dead on the signal." : myResult.points===0 ? "Off the wavelength." : "Close enough to feel it.")));
+    } else if (view.youArePsychic) {
+      var badgePsy = el("div","points-badge zero", "🎯");
+      box.appendChild(badgePsy);
+      box.appendChild(el("div","reveal-sub", "The signal is revealed!"));
+    } else {
+      var badgeSpec = el("div","points-badge zero", "👀");
+      box.appendChild(badgeSpec);
+      box.appendChild(el("div","reveal-sub", "Round over."));
+    }
     wrap.appendChild(box);
 
     var topicRow = el("div","topic-row");
@@ -1086,15 +1181,36 @@
       var star = el("div","target-star");
       star.style.left = r.target + "%";
       track.appendChild(star);
-      var puck = el("div","puck locked");
-      puck.style.left = r.guess + "%";
-      track.appendChild(puck);
+      
+      for (var pid in r.results) {
+        var puck = el("div","puck locked");
+        puck.style.left = r.results[pid].guess + "%";
+        var pl = view.players[pid];
+        if (pl) {
+          var c = nameColor(pl.name);
+          puck.style.background = "radial-gradient(circle at 35% 30%, #fff, " + c + " 60%)";
+          var cGlow = c.replace('hsl', 'hsla').replace(')', ', 0.2)');
+          puck.style.boxShadow = "0 0 0 4px " + cGlow + ", 0 4px 14px rgba(0,0,0,0.5)";
+          puck.title = pl.name + " (" + r.results[pid].points + " pts)";
+          puck.textContent = initials(pl.name);
+          puck.style.display = "flex";
+          puck.style.alignItems = "center";
+          puck.style.justifyContent = "center";
+          puck.style.fontSize = "12px";
+          puck.style.fontWeight = "700";
+          puck.style.color = "#0a0f12";
+        }
+        track.appendChild(puck);
+      }
     }
     trackWrap.appendChild(track);
     wrap.appendChild(trackWrap);
 
     var controls = el("div","controls");
-    controls.appendChild(claimButton("🔮 I'll go next"));
+    var nextBtn = el("button","btn btn-primary", "Next Round");
+    nextBtn.type="button";
+    nextBtn.addEventListener("click", function(){ sendAction({t:"nextRound"}); });
+    controls.appendChild(nextBtn);
     wrap.appendChild(controls);
 
     return wrap;
