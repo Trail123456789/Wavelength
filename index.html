@@ -215,8 +215,8 @@
   .topic-label.a{text-align:left; color:var(--teal);}
   .topic-label.b{text-align:right; color:var(--amber);}
 
-  .track-wrap{position:relative; padding:22px 4px 6px;}
-  .track{ position:relative; height:16px; touch-action:none; }
+  .track-wrap{position:relative; padding:22px 4px 6px; width:100%;}
+  .track{ position:relative; height:16px; touch-action:none; width:100%; }
   .track-inner {
     position: absolute; inset: 0; background: var(--track-groove);
     border: 1px solid var(--line); border-radius: 999px; overflow: hidden;
@@ -419,9 +419,25 @@
   var ROOM_PREFIX = "wvlen-sync-";
   var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; 
   
-  // By leaving PEER_OPTS empty, PeerJS defaults to its own provided STUN AND TURN servers.
-  // This completely fixes the silent hanging issue on strict NATs and mobile data.
-  var PEER_OPTS = {};
+  var PEER_OPTS = {
+    config: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" },
+        // TURN relay fallback — STUN alone fails to connect two browsers
+        // whenever either side is behind a stricter NAT (mobile data,
+        // school/office wifi, some routers/VPNs). When that happens the
+        // connection just hangs until the join timeout fires, even though
+        // the host is fine. TURN relays the traffic instead of trying to
+        // punch a direct hole through both NATs, which fixes that case.
+        { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+      ]
+    }
+  };
 
   var ZONES = [ {max:3.5, pts:4}, {max:8.5, pts:3}, {max:15, pts:2} ];
 
@@ -646,27 +662,38 @@
 
   function joinRoom(name, code){
     var p = new Peer(PEER_OPTS);
+    var joined = false;
     p.on("open", function(id){
       peer = p; isHost = false; myId = id; roomCode = code;
       var conn = p.connect(ROOM_PREFIX + code, {reliable:true});
       hostConn = conn;
 
       var openTimeout = setTimeout(function(){
-        $("join-error").textContent = "No one answered that room code. Double-check it with your host.";
+        $("join-error").textContent = "No one answered that room code. Double-check it with your host, and that you're both online.";
         $("btn-join-room").disabled = false;
         $("btn-join-room").textContent = "Join room";
         conn.close();
-      }, 14000); // Bumped to 14s to be forgiving for complex handshakes
+      }, 15000);
 
       conn.on("open", function(){
+        joined = true;
         clearTimeout(openTimeout);
         conn.send(JSON.stringify({t:"join", name:name}));
         lastMsgTime = Date.now();
         enterGameScreen();
       });
       conn.on("data", onClientData);
-      conn.on("close", scheduleReconnect);
-      conn.on("error", function(){ clearTimeout(openTimeout); scheduleReconnect(); });
+      conn.on("close", function(){ if(joined) scheduleReconnect(); });
+      conn.on("error", function(){
+        clearTimeout(openTimeout);
+        if(joined){
+          scheduleReconnect();
+        } else {
+          $("join-error").textContent = "Connection problem while joining. Try again.";
+          $("btn-join-room").disabled = false;
+          $("btn-join-room").textContent = "Join room";
+        }
+      });
     });
     p.on("error", function(err){
       if(err && err.type === "peer-unavailable"){
@@ -775,6 +802,9 @@
         loopCount++;
     }
 
+    // A round is one full lap through the current player list. Count the
+    // turn that just ended, and if that completes a lap, check whether
+    // we've hit the configured game length.
     state.turnsThisRound++;
     if (state.turnsThisRound >= state.playerOrder.length) {
       state.turnsThisRound = 0;
@@ -1118,7 +1148,7 @@
     return e;
   }
 
-  var pendingRoundChoice = 10; 
+  var pendingRoundChoice = 10; // host's local pre-game pick — not synced until Start Game is pressed
 
   function buildIdlePane(view){
     var wrap = el("div","state-msg");
@@ -1425,6 +1455,7 @@
   function buildRevealedPane(view){
     var wrap = el("div","state-msg");
     wrap.style.gap = "16px";
+    wrap.style.alignItems = "stretch";
 
     var r = view.lastResult;
     var box = el("div","reveal-box");
